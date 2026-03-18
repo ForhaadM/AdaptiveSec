@@ -1,0 +1,18 @@
+{
+    "manifest_version": 3,
+    "name": "AdaptiveSec",
+    "version": "1.0.0",
+    "description": "Phishing detection and security awareness extension",
+    "permissions": [
+        "offscreen",
+        "storage",
+        "tabs",
+        "activeTab"
+    ],
+    "background": {
+        "service_worker": "background.js"
+    },
+    "action": {
+        "default_popup": "popup.html"
+    }
+}
