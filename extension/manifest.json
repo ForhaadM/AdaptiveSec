@@ -3,6 +3,11 @@
     "name": "AdaptiveSec",
     "version": "1.0.0",
     "description": "Phishing detection and security awareness extension",
+    "icons": {
+        "16": "icons/icon16.png",
+        "48": "icons/icon48.png",
+        "128": "icons/icon128.png"
+    },
     "permissions": [
         "offscreen",
         "storage",
@@ -13,6 +18,11 @@
         "service_worker": "background.js"
     },
     "action": {
-        "default_popup": "popup.html"
+        "default_popup": "popup.html",
+        "default_icon": {
+            "16": "icons/icon16.png",
+            "48": "icons/icon48.png",
+            "128": "icons/icon128.png"
+        }
     }
 }
