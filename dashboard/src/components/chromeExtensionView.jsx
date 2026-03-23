@@ -9,7 +9,7 @@ export default function ChromeExtensionView() {
                 backgroundColor: "#080d18",
                 color: "#e8eaed",
                 padding: "0px 14px",
-                borderRadius: "8px",
+                borderRadius: "0px",
                 overflow: "hidden",
                 margin: "0",
 
