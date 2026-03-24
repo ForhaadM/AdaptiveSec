@@ -7,3 +7,14 @@ node_modules/
 *.log
 dist/
 build/
+.venv/
+
+# Datasets
+data/raw/
+data/gemini_prompt/
+
+Thumbs.db
+
+# IDE
+.idea/
+.pytest_cache/
