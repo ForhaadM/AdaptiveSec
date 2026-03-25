@@ -1,5 +1,6 @@
-from fastapi import FastAPI, Depends
-from auth import router as auth_router, get_current_user
+from fastapi import FastAPI, Depends, WebSocket, WebSocketDisconnect, Query, status
+from auth import router as auth_router, get_current_user, verify_token
+from websocket_manager import manager
 
 app = FastAPI(title="AdaptiveSec API")
 
@@ -8,3 +9,21 @@ app.include_router(auth_router)
 @app.get("/protected")
 async def protected_route(user_id: str = Depends(get_current_user)):
     return {"message": f"Hello {user_id}, you are authenticated"}
+
+@app.websocket("/ws/v1/alerts/{user_id}")
+async def websocket_alerts(
+    websocket: WebSocket,
+    user_id: str,
+    token: str = Query(...)
+):
+    payload = verify_token(token)
+    if not payload or payload.get("sub") != user_id:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return
+
+    await manager.connect(user_id, websocket)
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        manager.disconnect(user_id)
