@@ -1,21 +1,237 @@
-## Secrets Management
+# AdaptiveSec
 
-### Environment Variables
-This project uses a `.env` file for all secrets. This file is **never committed** to version control.
+## Adaptive Security Training Platform
 
-### Setup
-1. Copy `.env.example` to `.env`
-2. Fill in the values with credentials from the team lead
+AdaptiveSec is a behavioral risk analysis and security awareness platform that moves beyond generic cybersecurity training. Instead of one-size-fits-all modules, it delivers controlled phishing simulations, tracks which psychological triggers each user falls for, and automatically assigns targeted training — while the context is still fresh.
 
-### Key Ownership
-| Key | Owner |
-|-----|-------|
-| GEMINI_API_KEY | [assign to teammate] |
-| AWS_ACCESS_KEY_ID | [assign to teammate] |
-| AWS_SECRET_ACCESS_KEY | [assign to teammate] |
-| NEO4J_URI | [assign to teammate] |
-| NEO4J_USERNAME | [assign to teammate] |
-| NEO4J_PASSWORD | [assign to teammate] |
-| REDIS_URL | [assign to teammate] |
-| RABBITMQ_URL | [assign to teammate] |
-| JWT_SECRET | [assign to teammate] |
+---
+
+## Table of Contents
+
+- [The Problem](#the-problem)
+- [How It Works](#how-it-works)
+- [System Architecture](#system-architecture)
+- [Key Features](#key-features)
+- [Tech Stack](#tech-stack)
+- [Project Structure](#project-structure)
+- [Getting Started](#getting-started)
+- [Environment Variables](#environment-variables)
+- [API Overview](#api-overview)
+- [ML Pipeline](#ml-pipeline)
+- [Team](#team)
+
+---
+
+## The Problem
+
+Most cybersecurity training is generic and delivered long after real phishing attempts occur. Users forget the context and keep making the same mistakes. Organizations have no visibility into *which* users are most at risk or *why* — and they cannot provide interventions that address individual psychological vulnerabilities.
+
+AdaptiveSec closes this gap.
+
+---
+
+## How It Works
+
+1. **A simulated phishing link is surfaced to the user** — crafted around a psychological trigger (Urgency, Authority, Scarcity, or Social Proof).
+2. **The user clicks the link** — the Chrome Extension captures the interaction silently in the background and fires telemetry to the backend.
+3. **The ML pipeline processes the event** — an XGBoost model scores the technical risk, and an NLP model identifies the cognitive bias that was exploited.
+4. **The user's vulnerability profile is updated** in Neo4j — repeated exposure to the same trigger increases that vulnerability's weight.
+5. **A targeted training module is assigned** by the Recommendation Engine using Multi-Armed Bandit logic.
+6. **A plain-English counterfactual explanation is generated** (e.g., *"Your score increased because you clicked a link designed to pressure you with a time limit. This is an Urgency Bias trigger."*) and pushed to the user in real time via WebSocket.
+7. **Completing training reduces the user's risk score** and lowers their susceptibility to that trigger over time.
+
+---
+
+## System Architecture
+
+```text
+Chrome Extension  ──POST /api/v1/telemetry/click──►  FastAPI Backend
+      │                                                      │
+      │◄── WebSocket (real-time score + alerts) ────────────┤
+      │                                                      │
+      │                                              RabbitMQ Queue
+      │                                                      │
+      │                                           ML Pipeline Worker
+      │                                     ┌─────────────────────────┐
+      │                                     │  DataPreprocessor        │
+      │                                     │  FeatureVectorBuilder    │
+      │                                     │  RiskScoringEngine (XGB) │
+      │                                     │  CognitiveModel (NLP)    │
+      │                                     │  RecommendationEngine    │
+      │                                     │  ExplanationGenerator    │
+      │                                     └─────────────────────────┘
+      │                                                      │
+      │                                              Neo4j Graph DB
+      │                                              Redis Cache/Pub-Sub
+      │
+React Dashboard ──GET /api/v1/users/{id}/dashboard──► FastAPI Backend
+```
+
+### Infrastructure
+
+- **AWS Amplify** — hosts the React dashboard with CI/CD on push
+- **AWS EC2** — runs FastAPI behind an Application Load Balancer
+- **Neo4j Aura** — graph database storing user→vulnerability→training relationships
+- **Redis Cloud** — caches risk scores and serves as Pub/Sub backplane for WebSocket state across ALB nodes
+- **RabbitMQ** — async message queue decoupling the telemetry API from the ML pipeline
+
+---
+
+## Key Features
+
+| Feature | Description |
+| --- | --- |
+| **Dynamic Risk Scoring** | Live 0–100 risk score per user, updated in real time after each phishing interaction |
+| **Cognitive Vulnerability Profiling** | Tracks susceptibility across four triggers: Urgency, Authority, Scarcity, Social Proof |
+| **Adaptive Training Assignment** | Multi-Armed Bandit recommendation engine assigns the most effective module per user |
+| **Counterfactual Explanations** | Plain-English alerts generated by the ExplanationGenerator explain exactly why a score changed |
+| **Just-In-Time Training Nudges** | Browser popup fires immediately after a risky click, while the context is still fresh |
+| **Risk Score History** | Interactive timeline chart showing score trajectory over 30D / 90D / All time |
+| **Chrome Extension** | Sub-10ms local heuristic filter (INT8 quantized model via Offscreen Documents API) + silent telemetry forwarding |
+| **Real-Time Dashboard** | WebSocket-driven React dashboard — score updates push without a page refresh |
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+| --- | --- |
+| Frontend | React (Vite) |
+| Browser Extension | Chrome Extension Manifest V3, Offscreen Documents API |
+| Backend | Python, FastAPI |
+| ML | XGBoost, NLP cognitive model, Multi-Armed Bandit |
+| Database | Neo4j (graph) |
+| Cache / Pub-Sub | Redis |
+| Message Queue | RabbitMQ |
+| Explanation Generator | Template-based (primary) → Self-hosted Llama 3.2 3B (secondary) → Google Gemini API (fallback) |
+| Auth | JWT (bcrypt password hashing) |
+| Hosting | AWS Amplify (frontend), AWS EC2 (backend) |
+
+---
+
+## Project Structure
+
+```text
+AdaptiveSec/
+├── backend/
+│   ├── main.py                  # FastAPI app, routes, WebSocket handlers
+│   ├── auth.py                  # JWT authentication
+│   ├── ml_pipeline/             # ML processing modules
+│   │   ├── data_preprocessor.py
+│   │   ├── feature_vector_builder.py
+│   │   ├── risk_scoring_engine.py
+│   │   ├── cognitive_model.py
+│   │   ├── recommendation_engine.py
+│   │   └── explanation_generator.py
+│   └── requirements.txt
+├── dashboard/                   # React frontend (Vite)
+│   ├── src/
+│   └── public/
+├── extension/                   # Chrome Extension
+│   ├── manifest.json
+│   ├── background.js            # Service worker / event router
+│   ├── offscreen.js             # TensorFlow.js inference (Offscreen Documents API)
+│   ├── popup.html / popup.js    # Extension popup UI
+│   └── icons/
+├── data/
+│   └── raw/                     # Training datasets (Kaggle phishing, Nazario corpus)
+├── models/                      # Trained ML model artifacts
+├── scripts/                     # Utility scripts (synthetic data injection, etc.)
+└── requirements.txt
+```
+
+---
+
+## Getting Started
+
+### Prerequisites
+
+- Python 3.11
+- Node.js 18+
+- A `.env` file (see [Environment Variables](#environment-variables))
+
+### Backend
+
+```bash
+cd backend
+pip install -r requirements.txt
+uvicorn main:app --reload
+```
+
+### Dashboard
+
+```bash
+cd dashboard
+npm install
+npm run dev
+```
+
+### Chrome Extension
+
+1. Open Chrome and navigate to `chrome://extensions`
+2. Enable **Developer Mode** (top right)
+3. Click **Load unpacked** and select the `extension/` directory
+
+---
+
+## Environment Variables
+
+The `.env` file is **never committed to the repository**. Contact the team lead (Forhaad) to obtain it. Place it in the root of the `AdaptiveSec/` directory.
+
+Key variables include:
+
+```env
+NEO4J_URI=
+NEO4J_USERNAME=
+NEO4J_PASSWORD=
+REDIS_URL=
+RABBITMQ_URL=
+JWT_SECRET=
+GEMINI_API_KEY=
+```
+
+---
+
+## API Overview
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `POST` | `/api/v1/telemetry/click` | Ingest click event from Chrome Extension; queues to RabbitMQ, returns 202 |
+| `WS` | `/ws/v1/alerts/{user_id}` | Persistent WebSocket — pushes real-time score updates and training nudges |
+| `GET` | `/api/v1/users/{user_id}/dashboard` | Aggregated dashboard state (score, alerts, profile) |
+| `GET` | `/api/v1/users/{user_id}/profile` | Cognitive vulnerability profile from Neo4j |
+| `GET` | `/api/v1/users/{user_id}/risk-history` | Historical score data (`?range=30d\|90d\|all`) |
+| `GET` | `/api/v1/users/{user_id}/training` | Assigned training modules with progress |
+| `GET` | `/api/v1/training/{module_id}` | Training module content and metadata |
+| `POST` | `/api/v1/users/{user_id}/training/{module_id}/complete` | Mark module complete, triggers score recalculation |
+| `GET` | `/api/v1/events/{event_id}/explanation` | Counterfactual plain-English explanation for an event |
+
+---
+
+## ML Pipeline
+
+When a click event enters the RabbitMQ queue, it is processed sequentially through:
+
+1. **DataPreprocessor** — strips PII, hashes `user_id`
+2. **FeatureVectorBuilder** — converts URL and context into an 8-feature array:
+   - `url_length`, `num_subdomains`, `has_suspicious_keywords`, `contains_ip_address`, `is_https`, `time_of_day_encoded`, `session_fatigue_index`, `trigger_type_encoded`
+3. **RiskScoringEngine** — XGBoost model outputs `threat_score` (0–100) and `risk_delta`
+4. **CognitiveModel** — NLP model classifies the psychological trigger exploited (Urgency / Authority / Scarcity / Social Proof)
+5. **RecommendationEngine** — Multi-Armed Bandit assigns the optimal training module; updates Neo4j `[VULNERABLE_TO]` and `[ASSIGNED_TRAINING]` edges
+6. **ExplanationGenerator** — produces the counterfactual alert, publishes to Redis Pub/Sub → WebSocket pushes to user
+
+**Training data strategy:** Kaggle Phishing Websites Dataset (technical features) + Nazario Phishing Corpus (cognitive labels, few-shot prompted) + synthetic behavioral injection (fatigue, trigger types).
+
+---
+
+## Team
+
+| Name | Role |
+| --- | --- |
+| Forhaad Miah | CS |
+| Hamza Siddiqui | IT |
+| Niko Fushi | CS |
+| Adnan Vaktapuriya | CS |
+| Aiden Lee | CS |
+
+AdaptiveSec Capstone Project
