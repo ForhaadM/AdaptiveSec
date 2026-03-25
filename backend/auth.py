@@ -48,3 +48,10 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
         )
     token = create_access_token(data={"sub": form_data.username})
     return {"access_token": token, "token_type": "bearer"}
+
+def verify_token(token: str) -> dict | None:
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload
+    except JWTError:
+        return None

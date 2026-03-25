@@ -12,3 +12,5 @@ numpy>=1.26.0
 ucimlrepo
 
 pytest>=8.0.0
+neo4j>=5.0.0
+redis[asyncio]>=5.0.0
