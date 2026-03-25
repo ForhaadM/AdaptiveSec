@@ -5,7 +5,7 @@ import CognitiveProfileCard from './CognitiveProfileCard'
 export default function DashboardLayout() {
   return (
     <div className="dashboard-layout">
-      {/* Sidebar hidden but kept structure just in case */}
+      {/*
       <aside className="sidebar">
         <div className="sidebar-logo">
           <div className="sidebar-logo-icon">A</div>
@@ -13,11 +13,10 @@ export default function DashboardLayout() {
         </div>
         <nav>
           <div className="nav-item active">Dashboard</div>
-          {/* <div className="nav-item">Training</div> */}
-          {/* <div className="nav-item">Simulations</div> */}
           <div className="nav-item">Something</div>
         </nav>
-      </aside>
+      </aside> 
+      */}
 
       <main className="main-wrapper">
         <header className="top-navbar">

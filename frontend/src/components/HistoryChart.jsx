@@ -7,7 +7,7 @@ export default function HistoryChart() {
         </div>
         <span className="chart-link">Export CSV</span>
       </div>
-      
+
       <div className="chart-controls">
         <div className="chart-tabs">
           <button className="chart-tab active">30D</button>
@@ -15,10 +15,10 @@ export default function HistoryChart() {
           <button className="chart-tab">All</button>
         </div>
       </div>
-      
-      <div className="chart-placeholder" style={{ 
-        height: '250px', 
-        border: 'none', 
+
+      <div className="chart-placeholder" style={{
+        height: '250px',
+        border: 'none',
         background: 'transparent',
         display: 'flex',
         alignItems: 'center',
@@ -27,7 +27,7 @@ export default function HistoryChart() {
         fontFamily: 'var(--font-mono)',
         fontSize: '0.85rem'
       }}>
-        [ Graph component will be injected here ]
+        [ Graph component will be placed here ]
       </div>
     </div>
   )
