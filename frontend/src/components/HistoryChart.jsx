@@ -1,32 +1,32 @@
 import { useState, useMemo } from 'react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 
-// Generate mock data mimicking daily risk scores over the last 90 days.
+// Generate mock data mimicking daily risk scores.
 const generateMockData = () => {
   const data = [];
   const now = new Date();
   let currentScore = 35; // base score (low risk)
 
-  for (let i = 90; i >= 0; i--) {
+  for (let i = 180; i >= 0; i--) {
     const d = new Date(now);
     d.setDate(d.getDate() - i);
     
     // add some random noise
-    const noise = Math.floor(Math.random() * 10) - 5;
+    const noise = Math.floor(Math.random() * 8) - 4;
     currentScore = Math.max(0, Math.min(100, currentScore + noise));
     
     // Simulate some phishing test failures leading to spikes in risk score
     let isSpike = false;
-    if (i === 75 || i === 42 || i === 15) {
+    if (i === 150 || i === 110 || i === 75 || i === 42 || i === 15) {
       currentScore = Math.min(100, currentScore + 30 + Math.random() * 20);
       isSpike = true;
     }
     
     // Decay back down after a spike
-    if (i === 74 || i === 41 || i === 14) {
+    if (i === 149 || i === 109 || i === 74 || i === 41 || i === 14) {
       currentScore = Math.max(0, currentScore - 15);
     }
-    if (i === 73 || i === 40 || i === 13) {
+    if (i === 148 || i === 108 || i === 73 || i === 40 || i === 13) {
       currentScore = Math.max(0, currentScore - 10);
     }
 
@@ -81,7 +81,7 @@ export default function HistoryChart() {
   
   const displayData = useMemo(() => {
     if (timeRange === '30D') return fullData.slice(-30);
-    if (timeRange === '90D') return fullData;
+    if (timeRange === '90D') return fullData.slice(-90);
     return fullData; // Fallback for 'All'
   }, [fullData, timeRange]);
 
