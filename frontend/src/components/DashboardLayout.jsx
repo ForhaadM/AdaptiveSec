@@ -33,7 +33,7 @@ export default function DashboardLayout() {
           <div className="grid-layout">
             <RiskScoreWidget />
             <CognitiveProfileCard />
-            <TrainingProgressSection />
+            <TrainingProgressSection userId="test-user-123" />
             <HistoryChart />
           </div>
         </section>
