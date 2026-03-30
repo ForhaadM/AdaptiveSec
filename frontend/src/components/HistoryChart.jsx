@@ -132,7 +132,7 @@ export default function HistoryChart() {
               axisLine={false} 
               tickLine={false} 
               tick={{ fill: 'var(--text-muted)', fontSize: 12, fontFamily: 'var(--font-mono)' }}
-              minTickGap={20}
+              minTickGap={60}
             />
             <YAxis 
               axisLine={false} 
