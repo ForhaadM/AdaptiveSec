@@ -46,7 +46,29 @@ export default function TrainingProgressSection({ userId }) {
       fetch(`/api/v1/users/${userId}/training`)
         .then(res => res.json())
         .then(apiData => {
-          setData(apiData);
+          const today = new Date();
+          const modules = (apiData.modules || []).map(m => {
+            let status;
+            if (m.completed) {
+              status = 'complete';
+            } else if (m.progress > 0) {
+              status = 'in-progress';
+            } else if (m.due_date && new Date(m.due_date) < today) {
+              status = 'overdue';
+            } else {
+              status = 'not-started';
+            }
+            return {
+              id: m.module_id,
+              title: m.title,
+              category: m.bias_target,
+              progress: m.progress,
+              status,
+              dueDate: m.due_date,
+              completionDate: m.due_date,
+            };
+          });
+          setData(modules);
           setLoading(false);
         })
         .catch(err => {
