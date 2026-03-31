@@ -1,3 +1,8 @@
+'''Before any ML happens, every raw click event from the Chrome Extension passes through here first. 
+It strips PII, replaces email addresses and phone numbers with placeholders, and SHA-256 hashes the user_id so 
+the real identity never touches the ML pipeline. It also validates that all required fields are present and 
+normalizes the timestamp to a consistent format'''
+
 
 import hashlib
 import re

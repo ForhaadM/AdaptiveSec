@@ -1,3 +1,9 @@
+'''Takes the 8-number array, runs it through the trained XGBoost model, and returns a threat_score 
+between 0 and 100 plus a risk_delta representing how many points the user's risk score should change. 
+If the model artifact isn't available for any reason it automatically falls back to a heuristic scoring 
+function so the pipeline never fully breaks.'''
+
+
 import logging
 import os
 from typing import Any
