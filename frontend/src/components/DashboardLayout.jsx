@@ -2,6 +2,7 @@ import RiskScoreWidget from './RiskScoreWidget'
 import HistoryChart from './HistoryChart'
 import CognitiveProfileCard from './CognitiveProfileCard'
 import TrainingProgressSection from './TrainingProgressSection'
+import ScoreChangeExplanations from './ScoreChangeExplanations'
 
 export default function DashboardLayout() {
   return (
@@ -33,6 +34,7 @@ export default function DashboardLayout() {
           <div className="grid-layout">
             <RiskScoreWidget />
             <CognitiveProfileCard />
+            <ScoreChangeExplanations />
             <TrainingProgressSection userId="test-user-123" />
             <HistoryChart />
           </div>
