@@ -399,3 +399,172 @@ body {
 .chart-link:hover {
   color: var(--text-main);
 }
+
+/* Training Progress Card */
+.training-card {
+  display: flex;
+  flex-direction: column;
+  grid-column: span 6;
+}
+
+.border-bottom-light {
+    border-bottom: 1px solid var(--border-light);
+    padding-bottom: 12px;
+    margin-bottom: 16px;
+}
+
+.training-subtitle {
+  color: var(--text-mono);
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  margin-top: 4px;
+}
+
+.training-overall-pct {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 4px 12px;
+  border-radius: 8px;
+}
+
+.training-loading {
+  color: var(--text-muted);
+  text-align: center;
+  padding: 24px 0;
+}
+
+.training-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.training-item {
+  display: flex;
+  gap: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.training-item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.training-icon {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-light);
+}
+
+.training-details {
+  flex: 1;
+}
+
+.training-details-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.training-module-title {
+  font-weight: 500;
+  color: var(--text-main);
+  font-size: 0.95rem;
+}
+
+.training-category {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.training-date {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.training-module-progress {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.training-bar-bg {
+  flex: 1;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.training-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.fill-default {
+  background: var(--accent-blue);
+  box-shadow: 0 0 8px rgba(59, 130, 246, 0.4);
+}
+
+.fill-complete {
+  background: var(--accent-green);
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
+}
+
+.overall-fill {
+  background: linear-gradient(90deg, var(--accent-blue) 0%, var(--accent-purple) 100%);
+  box-shadow: 0 0 10px rgba(157, 92, 246, 0.4);
+}
+
+.training-pct {
+  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  color: var(--text-mono);
+  min-width: 32px;
+  text-align: right;
+}
+
+.status-complete {
+  color: var(--accent-green);
+}
+
+.status-overdue {
+  color: var(--risk-orange);
+}
+
+.btn-full-width {
+  width: 100%;
+  text-align: center;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-light);
+  color: var(--text-main);
+  transition: all 0.2s;
+  padding: 10px;
+  margin-bottom: 0px;
+}
+
+.btn-full-width:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.mt-4 {
+  margin-top: 16px;
+}
+
+.mb-4 {
+  margin-bottom: 16px;
+}
