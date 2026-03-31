@@ -2,11 +2,13 @@ from fastapi import FastAPI, Depends, WebSocket, WebSocketDisconnect, Query, sta
 from auth import router as auth_router, get_current_user, verify_token
 from websocket_manager import manager
 from routers.telemetry import router as telemetry_router
+from routers.dashboard import router as dashboard_router
 
 app = FastAPI(title="AdaptiveSec API")
 
 app.include_router(auth_router)
 app.include_router(telemetry_router)
+app.include_router(dashboard_router)
 
 @app.get("/protected")
 async def protected_route(user_id: str = Depends(get_current_user)):

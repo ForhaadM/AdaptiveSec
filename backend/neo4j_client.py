@@ -15,6 +15,7 @@ def init_schema():
     with driver.session() as session:
         session.run("CREATE CONSTRAINT IF NOT EXISTS FOR (u:User) REQUIRE u.user_id IS UNIQUE")
         session.run("CREATE CONSTRAINT IF NOT EXISTS FOR (t:CognitiveTrigger) REQUIRE t.name IS UNIQUE")
+        session.run("CREATE CONSTRAINT IF NOT EXISTS FOR (m:TrainingModule) REQUIRE m.module_id IS UNIQUE")
         session.run("MERGE (:CognitiveTrigger {name: 'Urgency'})")
         session.run("MERGE (:CognitiveTrigger {name: 'Authority'})")
         session.run("MERGE (:CognitiveTrigger {name: 'Scarcity'})")
