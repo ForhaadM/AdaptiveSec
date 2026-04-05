@@ -2,12 +2,15 @@ import httpx
 import asyncio
 import random
 import logging
+import json
+import websockets
 from datetime import datetime, timezone
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 BACKEND_URL = "http://localhost:8000"
+WS_URL = "ws://localhost:8000"
 
 PERSONAS = {
     "rushed_employee": {
@@ -94,6 +97,7 @@ class SyntheticAgent:
         self.risk_score = 50
         self.score_trajectory = [50]
         self.token = None
+        self.ws = None
 
     async def authenticate(self):
         async with httpx.AsyncClient() as client:
@@ -104,8 +108,37 @@ class SyntheticAgent:
             self.token = resp.json()["access_token"]
             logger.info(f"[{self.persona_name}] Authenticated as {self.user_id}")
 
+    async def connect_websocket(self):
+        uri = f"{WS_URL}/ws/v1/alerts/{self.user_id}?token={self.token}"
+        self.ws = await websockets.connect(uri)
+        logger.info(f"[{self.persona_name}] WebSocket connected")
+
+    async def wait_for_score_update(self, timeout: float = 10.0) -> dict | None:
+        try:
+            message = await asyncio.wait_for(self.ws.recv(), timeout=timeout)
+            payload = json.loads(message)
+            if payload.get("event") == "risk_update":
+                new_score = payload.get("new_score", self.risk_score)
+                self.update_score(new_score)
+                logger.info(
+                    f"[{self.persona_name}] Score update received → "
+                    f"new_score={new_score} "
+                    f"change={payload.get('score_change')} "
+                    f"training={payload.get('new_training_id')}"
+                )
+                return payload
+        except asyncio.TimeoutError:
+            logger.warning(
+                f"[{self.persona_name}] No score update received within {timeout}s — "
+                f"pipeline may not be fully wired yet"
+            )
+        return None
+
+    async def close_websocket(self):
+        if self.ws:
+            await self.ws.close()
+
     def calculate_click_probability(self, trigger_type: str) -> float:
-        # AC2: click_probability = trigger_susceptibility × (1 - baseline_caution) × (2 - fatigue_penalty) + noise
         susceptibility_key = f"{trigger_type}_susceptibility"
         trigger_susceptibility = self.profile.get(susceptibility_key, 0.0)
         baseline_caution = self.profile["baseline_caution"]
@@ -134,9 +167,9 @@ class SyntheticAgent:
 
         if clicked:
             await self.fire_telemetry(simulation)
+            await self.wait_for_score_update()
 
     async def fire_telemetry(self, simulation: dict):
-        # AC4: fire real HTTP POST to /api/v1/telemetry/click
         payload = {
             "user_id": self.user_id,
             "simulation_id": simulation["simulation_id"],
@@ -157,7 +190,6 @@ class SyntheticAgent:
             )
 
     def complete_training(self, trigger_type: str, learning_rate: float = 0.25):
-        # AC6: reduce susceptibility after training
         key = f"{trigger_type}_susceptibility"
         old = self.profile[key]
         self.profile[key] = old * (1 - learning_rate)
@@ -167,7 +199,6 @@ class SyntheticAgent:
         )
 
     def relapse_after_click(self, trigger_type: str, click_penalty: float = 0.1):
-        # AC7: partial recovery if agent clicks same trigger after training
         key = f"{trigger_type}_susceptibility"
         old = self.profile[key]
         self.profile[key] = old + (click_penalty * 0.5)
@@ -181,7 +212,6 @@ class SyntheticAgent:
         self.score_trajectory.append(new_score)
 
     def log_trajectory(self):
-        # AC9: log full score trajectory
         logger.info(
             f"[{self.persona_name}] Score trajectory: {self.score_trajectory}"
         )
@@ -199,6 +229,10 @@ async def run_all_agents():
     for agent in agents:
         await agent.authenticate()
 
+    
+    for agent in agents:
+        await agent.connect_websocket()
+
     # Run 5 simulation rounds per agent
     for round_num in range(1, 6):
         logger.info(f"\n--- Round {round_num} ---")
@@ -210,6 +244,10 @@ async def run_all_agents():
     # Log trajectories
     for agent in agents:
         agent.log_trajectory()
+
+    # Close WebSocket connections
+    for agent in agents:
+        await agent.close_websocket()
 
 
 if __name__ == "__main__":
