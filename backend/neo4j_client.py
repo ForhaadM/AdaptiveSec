@@ -51,7 +51,27 @@ def read_user_profile(user_id: str):
         records = result.data()
         print(f"Profile for {user_id}: {records}")
         return records
+def store_explanation(event_id: str, user_id: str, explanation: str, cognitive_trigger: str):
+    with driver.session() as session:
+        session.run("""
+            MERGE (u:User {user_id: $user_id})
+            MERGE (e:ClickEvent {event_id: $event_id})
+            SET e.explanation = $explanation,
+                e.cognitive_trigger = $cognitive_trigger,
+                e.created_at = datetime()
+            MERGE (u)-[:HAS_EVENT]->(e)
+        """, event_id=event_id, user_id=user_id,
+             explanation=explanation, cognitive_trigger=cognitive_trigger)
 
+def get_explanation(event_id: str) -> str | None:
+    with driver.session() as session:
+        result = session.run("""
+            MATCH (e:ClickEvent {event_id: $event_id})
+            RETURN e.explanation AS explanation
+        """, event_id=event_id)
+        record = result.single()
+        return record["explanation"] if record else None
+    
 if __name__ == "__main__":
     init_schema()
     test_vulnerable_to_edge("agent_alex_001", "Urgency", 0.85)
