@@ -15,7 +15,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 
 async function handleSimulationClick({ url, pageContext, timestamp }) {
-    // AC5: only fire for AdaptiveSec simulation URLs
     if (!url.includes(SIM_URL_PATTERN)) {
         console.log("[AdaptiveSec] Not a simulation URL, ignoring:", url);
         return;

@@ -1,4 +1,3 @@
-// content.js — detects simulation link clicks and notifies background
 document.addEventListener("click", (event) => {
     const target = event.target.closest("a");
     if (!target) return;
