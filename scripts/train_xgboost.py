@@ -1,20 +1,6 @@
 """
 train_xgboost.py
 ================
-AdaptiveSec — XGBoost Risk Scoring Model Training Script
-
-What this script does:
-    1. Loads PhiUSIIL (~235k rows) from data/raw/phiusiil/  — primary training set
-    2. Loads Kaggle 10k dataset from data/raw/kaggle/        — cross-validation set
-    3. Maps both datasets onto AdaptiveSec's 8-feature schema (F1–F8)
-    4. Synthetically injects F6, F7, F8 (behavioral columns not in either dataset)
-    5. Trains XGBoost on PhiUSIIL (80/20 internal split)
-    6. Cross-validates on the Kaggle 10k to confirm generalization
-    7. Saves the trained model artifact to models/xgboost_risk_model.json
-
-Dataset layout expected:
-    data/raw/phiusiil/   <- drop your PhiUSIIL CSV here (any filename works)
-    data/raw/kaggle/     <- drop your Kaggle 10k CSV here (any filename works)
 
 Run from the project root:
     python scripts/train_xgboost.py
@@ -105,7 +91,6 @@ def build_feature_matrix(
     Handles both PhiUSIIL (46 columns) and Kaggle (31 columns) by checking
     which columns are present and falling back gracefully for each.
 
-    DDD Feature Index Map (Section 4.2.B):
         F1 [0] url_length               <- URLLength (PhiUSIIL direct)
         F2 [1] num_subdomains           <- NoOfSubDomain (PhiUSIIL)
                                            having_Sub_Domain (Kaggle, -1/0/1 scale)

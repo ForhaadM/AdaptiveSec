@@ -1,3 +1,8 @@
+'''Takes the sanitized payload and converts it into the 8-number array that XGBoost actually understands — 
+things like how long the URL is, whether it uses HTTPS, whether it contains suspicious words 
+like "urgent" or "verify", what time of day it was clicked. Raw text and JSON mean nothing to a 
+machine learning model; this module turns the real-world event into math.'''
+
 import re
 import logging
 from urllib.parse import urlparse
