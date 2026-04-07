@@ -4,32 +4,38 @@ import pika
 from ml_pipeline.preprocessor import DataPreprocessor
 from ml_pipeline.feature_builder import FeatureVectorBuilder
 from ml_pipeline.risk_engine import RiskScoringEngine
+from neo4j_client import test_vulnerable_to_edge
 
 QUEUE_NAME = "simulation_events"
 
 
 def process_event(body):
-
     event = json.loads(body)
-
     print("Received click event:", event)
 
-    # Step 1: preprocessing
     pre = DataPreprocessor()
     sanitized = pre.sanitize(event)
 
-    # Step 2: feature vector
     builder = FeatureVectorBuilder()
     features = builder.extract(sanitized)
 
-    # Step 3: risk scoring
     engine = RiskScoringEngine()
-    risk = engine.predict(features)
+    result = engine.predict(features)
 
-    print("Risk score:", risk)
+    threat_score = result["threat_score"]
+    risk_delta = result["risk_delta"]
+    model_source = result["model_source"]
 
-    # TODO
-    # later write to Neo4j and publish to Redis
+    print("Sanitized payload:", sanitized)
+    print("Feature vector:", features)
+    print(
+        f"Threat score: {threat_score}, Risk delta: {risk_delta}, model_source: {model_source}"
+    )
+
+    user_id = event["user_id"]
+    trigger = event.get("trigger_type", "unknown")
+
+    test_vulnerable_to_edge(user_id, trigger, threat_score)
 
 
 def callback(ch, method, properties, body):
