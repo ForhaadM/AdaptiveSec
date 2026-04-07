@@ -15,6 +15,10 @@ data/gemini_prompt/
 
 Thumbs.db
 
+# Chrome extension build artifacts
+*.pem
+*.crx
+
 # IDE
 .idea/
 .pytest_cache/
