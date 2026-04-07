@@ -51,6 +51,41 @@ def read_user_profile(user_id: str):
         records = result.data()
         print(f"Profile for {user_id}: {records}")
         return records
+
+def update_trigger_weight(user_id: str, trigger: str):
+    schema_map = {
+        "Urgency_Bias": "Urgency",
+        "Authority_Bias": "Authority",
+        "Scarcity_Bias": "Scarcity",
+        "Social_Proof_Bias": "Social Proof"
+    }
+    schema_trigger = schema_map.get(trigger, trigger)
+    
+    with driver.session() as session:
+        session.run("""
+            MERGE (u:User {user_id: $user_id})
+            MERGE (t:CognitiveTrigger {name: $trigger})
+            MERGE (u)-[r:VULNERABLE_TO]->(t)
+            SET r.bias_score = coalesce(r.bias_score, 0) + 1.0
+        """, user_id=user_id, trigger=schema_trigger)
+        print(f"Updated trigger weight for {user_id}: {schema_trigger}")
+
+def get_dominant_cognitive_trigger(user_id: str) -> str | None:
+    with driver.session() as session:
+        result = session.run("""
+            MATCH (u:User {user_id: $user_id})-[r:VULNERABLE_TO]->(t:CognitiveTrigger)
+            WHERE t.name IN ['Urgency', 'Authority', 'Scarcity', 'Social Proof']
+            WITH u, sum(r.bias_score) AS total_score
+            WHERE total_score >= 3.0
+            MATCH (u)-[r:VULNERABLE_TO]->(t:CognitiveTrigger)
+            WHERE t.name IN ['Urgency', 'Authority', 'Scarcity', 'Social Proof']
+            RETURN t.name AS trigger, r.bias_score AS score
+            ORDER BY score DESC
+            LIMIT 1
+        """, user_id=user_id)
+        record = result.single()
+        return record["trigger"] if record else None
+
 def store_explanation(event_id: str, user_id: str, explanation: str, cognitive_trigger: str):
     with driver.session() as session:
         session.run("""
