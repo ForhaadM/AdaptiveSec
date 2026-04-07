@@ -8,4 +8,5 @@ __all__ = [
     "FeatureVectorBuilder",
     "RiskScoringEngine",
     "CognitiveModel",
+    "RecommendationEngine",
 ]

@@ -112,3 +112,36 @@ if __name__ == "__main__":
     test_vulnerable_to_edge("agent_alex_001", "Urgency", 0.85)
     test_assigned_training_edge("agent_alex_001", "TM-URG-01")
     read_user_profile("agent_alex_001")
+    
+def assign_training_module(user_id: str, module_id: str, due_date: str):
+    with driver.session() as session:
+        session.run("""
+            MERGE (u:User {user_id: $user_id})
+            MERGE (m:TrainingModule {module_id: $module_id})
+            MERGE (u)-[r:ASSIGNED_TRAINING]->(m)
+            SET r.due_date = $due_date,
+                r.status = 'incomplete',
+                r.assigned_at = datetime()
+        """, user_id=user_id, module_id=module_id, due_date=due_date)
+        print(f"ASSIGNED_TRAINING edge created: {user_id} -> {module_id} | due={due_date}")
+ 
+ 
+def get_active_assignment(user_id: str, trigger_name: str) -> str | None:
+    trigger_to_module = {
+        "Urgency":      "TM-URG-01",
+        "Authority":    "TM-AUT-01",
+        "Scarcity":     "TM-SCA-01",
+        "Social Proof": "TM-SOC-01",
+    }
+    module_id = trigger_to_module.get(trigger_name)
+    if not module_id:
+        return None
+ 
+    with driver.session() as session:
+        result = session.run("""
+            MATCH (u:User {user_id: $user_id})-[r:ASSIGNED_TRAINING]->(m:TrainingModule {module_id: $module_id})
+            WHERE r.status = 'incomplete'
+            RETURN m.module_id AS module_id
+        """, user_id=user_id, module_id=module_id)
+        record = result.single()
+        return record["module_id"] if record else None
