@@ -43,5 +43,12 @@
                 "content.js"
             ]
         }
-    ]
+    ],
+    "oauth2": {
+        "client_id": "249448483003-sgkodoul8v7mju24o03bejohno1h777s.apps.googleusercontent.com",
+        "scopes": [
+        "https://www.googleapis.com/auth/userinfo.email",
+        "https://www.googleapis.com/auth/userinfo.profile"
+        ]
+    }
 }
