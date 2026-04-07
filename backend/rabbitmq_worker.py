@@ -1,10 +1,14 @@
 import json
 import pika
+import logging
 
 from ml_pipeline.preprocessor import DataPreprocessor
 from ml_pipeline.feature_builder import FeatureVectorBuilder
 from ml_pipeline.risk_engine import RiskScoringEngine
-from neo4j_client import test_vulnerable_to_edge
+from ml_pipeline.cognitive_model import CognitiveModel
+from neo4j_client import test_vulnerable_to_edge, update_trigger_weight
+
+logger = logging.getLogger(__name__)
 
 QUEUE_NAME = "simulation_events"
 
@@ -36,6 +40,16 @@ def process_event(body):
     trigger = event.get("trigger_type", "unknown")
 
     test_vulnerable_to_edge(user_id, trigger, threat_score)
+
+    try:
+        cognitive_model = CognitiveModel()
+        tag_result = cognitive_model.tag_trigger(sanitized.get("page_context", ""))
+        cognitive_trigger = tag_result.get("cognitive_trigger")
+        
+        if cognitive_trigger and cognitive_trigger != "None":
+            update_trigger_weight(user_id, cognitive_trigger)
+    except Exception as e:
+        logger.warning(f"CognitiveModel failed or returned None: {e}")
 
 
 def callback(ch, method, properties, body):
