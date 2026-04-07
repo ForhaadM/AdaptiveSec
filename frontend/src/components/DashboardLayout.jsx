@@ -1,3 +1,4 @@
+import { useAuth } from '../AuthContext'
 import RiskScoreWidget from './RiskScoreWidget'
 import HistoryChart from './HistoryChart'
 import CognitiveProfileCard from './CognitiveProfileCard'
@@ -5,24 +6,19 @@ import TrainingProgressSection from './TrainingProgressSection'
 import ScoreChangeExplanations from './ScoreChangeExplanations'
 
 export default function DashboardLayout() {
+  // user contains { user_id, name, email, token } set after Google sign-in
+  const { user, logout } = useAuth()
+
   return (
     <div className="dashboard-layout">
-      {/*
-      <aside className="sidebar">
-        <div className="sidebar-logo">
-          <div className="sidebar-logo-icon">A</div>
-          AdaptiveSec
-        </div>
-        <nav>
-          <div className="nav-item active">Dashboard</div>
-          <div className="nav-item">Something</div>
-        </nav>
-      </aside> 
-      */}
-
       <main className="main-wrapper">
-        <header className="top-navbar">
-          {/* <input type="text" className="search-bar" placeholder="Search..." /> */}
+        <header className="top-navbar" style={{ position: 'relative' }}>
+          <div className="navbar-user">
+            <span style={{ fontSize: '1.15rem', fontWeight: '500', letterSpacing: '-0.01em', background: 'linear-gradient(90deg, #a0aec0, #cbd5e0, var(--accent-blue) 80%, var(--accent-purple))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+              Welcome, {user?.name}
+            </span>
+          </div>
+          <button className="logout-btn" onClick={logout} style={{ position: 'absolute', top: '12px', right: '24px' }}>Sign out</button>
         </header>
 
         <section className="main-content">
@@ -35,7 +31,7 @@ export default function DashboardLayout() {
             <RiskScoreWidget />
             <CognitiveProfileCard />
             <ScoreChangeExplanations />
-            <TrainingProgressSection userId="test-user-123" />
+            <TrainingProgressSection userId={user?.user_id} />
             <HistoryChart />
           </div>
         </section>

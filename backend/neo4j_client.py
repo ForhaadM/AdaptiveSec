@@ -74,7 +74,7 @@ def get_explanation(event_id: str) -> str | None:
 
 def upsert_user(user_id: str, email: str = "", display_name: str = ""):
     """Create or update a User node. Used after Google OAuth to persist the
-    Google ID (sub) along with the user's email and display name (AC3)."""
+    Google ID (sub) along with the user's email and display name."""
     with driver.session() as session:
         session.run("""
             MERGE (u:User {user_id: $user_id})
