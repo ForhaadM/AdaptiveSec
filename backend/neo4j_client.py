@@ -5,9 +5,9 @@ import os
 
 load_dotenv(dotenv_path=Path(__file__).parent.parent / ".env", override=True, encoding='utf-8-sig')
 
-URI = os.getenv("NEO4J_URI")
-USERNAME = os.getenv("NEO4J_USERNAME")
-PASSWORD = os.getenv("NEO4J_PASSWORD")
+URI = os.getenv("NEO4J_URI", "")
+USERNAME = os.getenv("NEO4J_USERNAME", "")
+PASSWORD = os.getenv("NEO4J_PASSWORD", "")
 
 driver = GraphDatabase.driver(URI, auth=(USERNAME, PASSWORD))
 
@@ -71,6 +71,15 @@ def get_explanation(event_id: str) -> str | None:
         """, event_id=event_id)
         record = result.single()
         return record["explanation"] if record else None
+
+def upsert_user(user_id: str, email: str = "", display_name: str = ""):
+    """Create or update a User node. Used after Google OAuth to persist the
+    Google ID (sub) along with the user's email and display name (AC3)."""
+    with driver.session() as session:
+        session.run("""
+            MERGE (u:User {user_id: $user_id})
+            SET u.email = $email, u.display_name = $display_name
+        """, user_id=user_id, email=email, display_name=display_name)
     
 if __name__ == "__main__":
     init_schema()
