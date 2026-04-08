@@ -5,27 +5,25 @@ import redis as sync_redis
 from google import genai
 from dotenv import load_dotenv
 from pathlib import Path
-
+ 
 load_dotenv(dotenv_path=Path(__file__).parent.parent.parent.parent / ".env")
-
+ 
 logger = logging.getLogger(__name__)
-
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+ 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
-
-client = genai.Client(api_key=GEMINI_API_KEY)
-
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+ 
 SYSTEM_PROMPT = """You are a supportive cybersecurity coach helping employees 
 improve their security awareness. Your job is to explain why a simulated 
 phishing attempt was successful in a kind, educational, and non-judgmental way.
-
+ 
 STRICT RULES:
 - Never use phrases like "you failed", "you should have known", "you made a mistake"
 - Always be encouraging and forward-looking
 - Keep explanations under 3 sentences
 - Always end with one concrete actionable tip
 """
-
+ 
 TRIGGER_DESCRIPTIONS = {
     "Urgency_Bias": "time pressure and urgency",
     "Authority_Bias": "authority and official-looking requests",
@@ -33,7 +31,7 @@ TRIGGER_DESCRIPTIONS = {
     "SocialProof_Bias": "social proof and peer influence",
     "None": "general deception tactics",
 }
-
+ 
 FALLBACK_TEMPLATES = {
     "Urgency_Bias": (
         "Your score increased because you clicked a link that used time pressure "
@@ -64,13 +62,13 @@ FALLBACK_TEMPLATES = {
         "matches what you expect."
     ),
 }
-
-
+ 
+ 
 class ExplanationGenerator:
-
+ 
     def __init__(self):
         self.client = genai.Client(api_key=GEMINI_API_KEY)
-
+ 
     def generate(
         self,
         user_id: str,
@@ -94,7 +92,7 @@ class ExplanationGenerator:
                 f"[ExplanationGenerator] Gemini failed, using fallback: {e}"
             )
             explanation = self._fallback_explanation(cognitive_trigger, risk_delta)
-
+ 
         if event_id:
             try:
                 from neo4j_client import store_explanation
@@ -107,7 +105,7 @@ class ExplanationGenerator:
                 logger.warning(
                     f"[ExplanationGenerator] Neo4j store failed: {e}"
                 )
-
+ 
         alert_payload = {
             "event": "risk_update",
             "new_score": new_score,
@@ -117,9 +115,9 @@ class ExplanationGenerator:
             "cognitive_trigger": cognitive_trigger
         }
         self.publish_to_redis(user_id, alert_payload)
-
+ 
         return explanation
-
+ 
     def publish_to_redis(self, user_id: str, alert_payload: dict):
         try:
             r = sync_redis.from_url(REDIS_URL)
@@ -132,7 +130,7 @@ class ExplanationGenerator:
             logger.warning(
                 f"[ExplanationGenerator] Redis publish failed: {e}"
             )
-
+ 
     def _call_gemini(
         self,
         cognitive_trigger: str,
@@ -142,28 +140,28 @@ class ExplanationGenerator:
         trigger_desc = TRIGGER_DESCRIPTIONS.get(
             cognitive_trigger, "deception tactics"
         )
-
+ 
         prompt = f"""{SYSTEM_PROMPT}
-
+ 
 A user just clicked a simulated phishing link during a security awareness training.
-
+ 
 Phishing content they saw: "{page_context[:200]}"
 Psychological tactic used: {trigger_desc}
 Risk score increase: +{risk_delta} points
-
+ 
 Write a 2-3 sentence explanation that:
 1. Explains which cognitive bias was exploited and how it was used in this specific message
 2. Mentions their score increased by {risk_delta} points
 3. Gives one concrete tip to avoid this in the future
-
+ 
 Be warm, encouraging, and specific to the message content above."""
-
+ 
         response = self.client.models.generate_content(
             model="gemini-2.5-flash",
             contents=prompt
         )
         return response.text.strip()
-
+ 
     def _fallback_explanation(
         self,
         cognitive_trigger: str,
@@ -177,3 +175,4 @@ Be warm, encouraging, and specific to the message content above."""
             "Your score increased",
             f"Your score increased by {risk_delta} points"
         )
+ 
