@@ -148,10 +148,10 @@ def get_active_assignment(user_id: str, trigger_name: str) -> str | None:
         record = result.single()
         return record["module_id"] if record else None
 
-# --- W4-013: Risk Score Persistence ---
+# Risk Score Persistence
 
 def persist_risk_score(user_id: str, risk_score: float):
-    """AC1 — Set current risk_score on User node."""
+    """Set current risk_score on User node."""
     with driver.session() as session:
         session.run("""
             MERGE (u:User {user_id: $user_id})
@@ -161,7 +161,7 @@ def persist_risk_score(user_id: str, risk_score: float):
         print(f"[Neo4j] Persisted risk_score={risk_score} for {user_id}")
 
 def create_score_history(user_id: str, score: float, delta: float, reason: str):
-    """AC2 — Create a ScoreHistory node linked via HAS_SCORE_HISTORY."""
+    """Create a ScoreHistory node linked via HAS_SCORE_HISTORY."""
     with driver.session() as session:
         session.run("""
             MERGE (u:User {user_id: $user_id})
@@ -176,7 +176,7 @@ def create_score_history(user_id: str, score: float, delta: float, reason: str):
         print(f"[Neo4j] ScoreHistory created for {user_id}: score={score} delta={delta}")
 
 def get_risk_score(user_id: str) -> float:
-    """AC3/AC6 — Read current risk_score from User node."""
+    """Read current risk_score from User node."""
     with driver.session() as session:
         result = session.run("""
             MATCH (u:User {user_id: $user_id})
@@ -186,7 +186,7 @@ def get_risk_score(user_id: str) -> float:
         return float(record["risk_score"]) if record and record["risk_score"] is not None else 0.0
 
 def get_score_history(user_id: str, range_days: int = 30) -> list:
-    """AC4 — Return ScoreHistory nodes within the requested time window."""
+    """Return ScoreHistory nodes within the requested time window."""
     with driver.session() as session:
         result = session.run("""
             MATCH (u:User {user_id: $user_id})-[:HAS_SCORE_HISTORY]->(h:ScoreHistory)
@@ -195,6 +195,33 @@ def get_score_history(user_id: str, range_days: int = 30) -> list:
                    h.reason AS reason, toString(h.timestamp) AS timestamp
             ORDER BY h.timestamp DESC
         """, user_id=user_id, range_days=range_days)
+        return result.data()
+
+# TrainingModule Queries 
+
+def get_training_module(module_id: str) -> dict | None:
+    """Return full metadata for a TrainingModule node."""
+    with driver.session() as session:
+        result = session.run("""
+            MATCH (m:TrainingModule {module_id: $module_id})
+            RETURN m.module_id AS module_id, m.title AS title,
+                   m.video_urls AS video_urls, m.bias_target AS bias_target,
+                   m.duration_seconds AS duration_seconds
+        """, module_id=module_id)
+        record = result.single()
+        return dict(record) if record else None
+
+def get_user_training(user_id: str) -> list:
+    """Return assigned modules with full title and video_urls populated."""
+    with driver.session() as session:
+        result = session.run("""
+            MATCH (u:User {user_id: $user_id})-[r:ASSIGNED_TRAINING]->(m:TrainingModule)
+            RETURN m.module_id AS module_id, m.title AS title,
+                   m.video_urls AS video_urls, m.bias_target AS bias_target,
+                   m.duration_seconds AS duration_seconds,
+                   r.status AS status, r.due_date AS due_date
+            ORDER BY r.assigned_at DESC
+        """, user_id=user_id)
         return result.data()
 
 if __name__ == "__main__":
