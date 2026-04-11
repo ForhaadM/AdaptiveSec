@@ -1,13 +1,25 @@
+from contextlib import asynccontextmanager
+import asyncio
 from fastapi import FastAPI, Depends, WebSocket, WebSocketDisconnect, Query, status, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from auth import router as auth_router, get_current_user, verify_token
 from websocket_manager import manager
 from routers.telemetry import router as telemetry_router
 from neo4j_client import get_risk_score, get_score_history, get_training_module, get_user_training
+from simulation_engine import simulation_engine
 import redis as sync_redis
 import os
 
-app = FastAPI(title="AdaptiveSec API")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    asyncio.create_task(simulation_engine.run_delivery_loop(manager))
+    yield
+    # Shutdown 
+
+
+app = FastAPI(title="AdaptiveSec API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -20,9 +32,11 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(telemetry_router)
 
+
 @app.get("/protected")
 async def protected_route(user_id: str = Depends(get_current_user)):
     return {"message": f"Hello {user_id}, you are authenticated"}
+
 
 @app.websocket("/ws/v1/alerts/{user_id}")
 async def websocket_alerts(
@@ -42,6 +56,7 @@ async def websocket_alerts(
     except WebSocketDisconnect:
         manager.disconnect(user_id)
 
+
 # Risk Score Endpoints 
 
 @app.get("/api/v1/users/{user_id}/dashboard")
@@ -54,6 +69,7 @@ async def get_dashboard(user_id: str, current_user: str = Depends(get_current_us
     else:
         risk_score = get_risk_score(user_id)
     return {"user_id": user_id, "risk_score": risk_score}
+
 
 @app.get("/api/v1/users/{user_id}/risk-history")
 async def get_risk_history(
@@ -69,24 +85,26 @@ async def get_risk_history(
     history = get_score_history(user_id, range_days)
     return {"user_id": user_id, "range": range, "history": history}
 
-#  Training Module Endpoints 
+
+# Training Module Endpoints 
 
 @app.get("/api/v1/training/{module_id}")
 async def get_training_module_detail(
     module_id: str,
     current_user: str = Depends(get_current_user)
 ):
-    """AC4 — Return full module metadata including title and video URLs."""
+    """Return full module metadata including title and video URLs."""
     module = get_training_module(module_id)
     if not module:
         raise HTTPException(status_code=404, detail="Module not found")
     return module
+
 
 @app.get("/api/v1/users/{user_id}/training")
 async def get_user_training_modules(
     user_id: str,
     current_user: str = Depends(get_current_user)
 ):
-    """AC5 — Return assigned modules with full title and video URLs populated."""
+    """Return assigned modules with full title and video URLs populated."""
     modules = get_user_training(user_id)
     return {"user_id": user_id, "modules": modules}
