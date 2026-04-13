@@ -75,8 +75,10 @@ function TrainingIcon({ completed, overdue, color }) {
 
 export default function ExtensionPopup() {
   const { user, logout } = useAuth()
+  const [risk, setRisk]         = useState(null)
+  const [training, setTraining] = useState(null)
+  const [latestAlert, setLatestAlert] = useState(null)
   const [dashboard, setDashboard] = useState(null)
-  const [training,  setTraining]  = useState(null)
   const [history,   setHistory]   = useState(null)
   const [loadedAt,  setLoadedAt]  = useState(null)
   const [nudge,     setNudge]     = useState(null)
@@ -107,7 +109,27 @@ export default function ExtensionPopup() {
       .then(r => r.json())
       .then(d => setHistory(d.data_points || []))
       .catch(() => {})
-  }, [user])
+      
+      // read latest alert from background script
+      chrome.storage.local.get(['latest_alert'], (result) => {
+        if (result.latest_alert) {
+          setLatestAlert(result.latest_alert)
+        }
+    })
+
+      const storageListener = (changes, area) => {
+        if (area === 'local' && changes.latest_alert) {
+          setLatestAlert(changes.latest_alert.newValue)
+        }
+      }
+
+      chrome.storage.onChanged.addListener(storageListener)
+
+      return () => {
+        chrome.storage.onChanged.removeListener(storageListener)
+      }
+
+      }, [user])
 
   function dismissNudge() {
     chrome.storage.local.remove(['latest_alert'])
