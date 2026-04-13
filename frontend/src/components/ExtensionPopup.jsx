@@ -7,8 +7,8 @@ function riskColor(label) {
   if (!label) return '#f97316'
   const l = label.toLowerCase()
   if (l === 'critical') return '#ef4444'
-  if (l === 'high')     return '#f97316'
-  if (l === 'medium')   return '#f59e0b'
+  if (l === 'high') return '#f97316'
+  if (l === 'medium') return '#f59e0b'
   return '#22c55e'
 }
 
@@ -23,7 +23,7 @@ function buildSparkPath(points) {
     const cpx = ((xs[i - 1] + xs[i]) / 2).toFixed(1)
     line += ` C ${cpx} ${ys[i - 1].toFixed(1)}, ${cpx} ${ys[i].toFixed(1)}, ${xs[i].toFixed(1)} ${ys[i].toFixed(1)}`
   }
-  const fill = `${line} L ${xs[n-1].toFixed(1)} ${H} L ${xs[0].toFixed(1)} ${H} Z`
+  const fill = `${line} L ${xs[n - 1].toFixed(1)} ${H} L ${xs[0].toFixed(1)} ${H} Z`
   return { line, fill, lastX: xs[n - 1], lastY: ys[n - 1] }
 }
 
@@ -75,13 +75,13 @@ function TrainingIcon({ completed, overdue, color }) {
 
 export default function ExtensionPopup() {
   const { user, logout } = useAuth()
-  const [risk, setRisk]         = useState(null)
+  const [risk, setRisk] = useState(null)
   const [training, setTraining] = useState(null)
   const [latestAlert, setLatestAlert] = useState(null)
   const [dashboard, setDashboard] = useState(null)
-  const [history,   setHistory]   = useState(null)
-  const [loadedAt,  setLoadedAt]  = useState(null)
-  const [nudge,     setNudge]     = useState(null)
+  const [history, setHistory] = useState(null)
+  const [loadedAt, setLoadedAt] = useState(null)
+  const [nudge, setNudge] = useState(null)
 
   // Load live alert from chrome.storage
   useEffect(() => {
@@ -98,38 +98,38 @@ export default function ExtensionPopup() {
     fetch(`${BACKEND}/api/v1/users/${user.user_id}/dashboard`, { headers })
       .then(r => r.json())
       .then(d => { setDashboard(d); setLoadedAt(new Date()) })
-      .catch(() => {})
+      .catch(() => { })
 
     fetch(`${BACKEND}/api/v1/users/${user.user_id}/training`, { headers })
       .then(r => r.json())
       .then(d => setTraining(d.modules || []))
-      .catch(() => {})
+      .catch(() => { })
 
     fetch(`${BACKEND}/api/v1/users/${user.user_id}/risk-history?range=30d`, { headers })
       .then(r => r.json())
       .then(d => setHistory(d.data_points || []))
-      .catch(() => {})
-      
-      // read latest alert from background script
-      chrome.storage.local.get(['latest_alert'], (result) => {
-        if (result.latest_alert) {
-          setLatestAlert(result.latest_alert)
-        }
+      .catch(() => { })
+
+    // read latest alert from background script
+    chrome.storage.local.get(['latest_alert'], (result) => {
+      if (result.latest_alert) {
+        setLatestAlert(result.latest_alert)
+      }
     })
 
-      const storageListener = (changes, area) => {
-        if (area === 'local' && changes.latest_alert) {
-          setLatestAlert(changes.latest_alert.newValue)
-        }
+    const storageListener = (changes, area) => {
+      if (area === 'local' && changes.latest_alert) {
+        setLatestAlert(changes.latest_alert.newValue)
       }
+    }
 
-      chrome.storage.onChanged.addListener(storageListener)
+    chrome.storage.onChanged.addListener(storageListener)
 
-      return () => {
-        chrome.storage.onChanged.removeListener(storageListener)
-      }
+    return () => {
+      chrome.storage.onChanged.removeListener(storageListener)
+    }
 
-      }, [user])
+  }, [user])
 
   function dismissNudge() {
     chrome.storage.local.remove(['latest_alert'])
@@ -141,11 +141,11 @@ export default function ExtensionPopup() {
     chrome.tabs.create({ url })
   }
 
-  const score  = dashboard?.risk_score ?? null
-  const label  = dashboard?.risk_label ?? '—'
-  const color  = riskColor(dashboard?.risk_label)
+  const score = dashboard?.risk_score ?? null
+  const label = dashboard?.risk_label ?? '—'
+  const color = riskColor(dashboard?.risk_label)
 
-  const vulns   = dashboard?.vulnerability_profile_summary || []
+  const vulns = dashboard?.vulnerability_profile_summary || []
   const dominant = vulns.length > 0
     ? vulns.reduce((a, b) => (b.bias_score > a.bias_score ? b : a))
     : null
@@ -226,6 +226,16 @@ export default function ExtensionPopup() {
             }}>
               You just clicked a link from an <strong style={{ color: '#e8eaed' }}>unverified domain</strong>. This matches a pattern linked to your risk profile.
             </p>
+
+            {/* Added risk details */}
+            {latestAlert && (
+              <div style={{ marginTop: 8, fontSize: 12 }}>
+                <div><strong>Risk Change:</strong> +{latestAlert.score_delta}</div>
+                <div><strong>Cognitive Bias:</strong> {latestAlert.bias_tag}</div>
+                <div><strong>Updated Risk Score:</strong> {latestAlert.risk_score}</div>
+              </div>
+            )}
+
             <div style={{ marginBottom: 10 }}>
               <span style={{
                 display: 'inline-flex', alignItems: 'center', gap: 4,
@@ -384,8 +394,8 @@ export default function ExtensionPopup() {
           ) : training.length === 0 ? (
             <span style={{ fontSize: 11, color: '#64748b' }}>No training assigned.</span>
           ) : training.map(m => {
-            const pct      = Math.round(m.progress || 0)
-            const overdue  = !m.completed && m.due_date && new Date(m.due_date) < new Date()
+            const pct = Math.round(m.progress || 0)
+            const overdue = !m.completed && m.due_date && new Date(m.due_date) < new Date()
             const barColor = m.completed ? '#22c55e' : overdue ? '#f97316' : '#3b82f6'
 
             return (
@@ -429,33 +439,33 @@ export default function ExtensionPopup() {
 
         {/* ── Open Full Dashboard button ── */}
         <div style={{ padding: '20px 0 14px', borderTop: '1px solid #1a2540' }}>
-        <button onClick={openFullDashboard} style={{
-          width: '100%', height: 38,
-          background: 'linear-gradient(135deg, #1d4ed8 0%, #0891b2 100%)',
-          borderRadius: 8, border: 'none',
-          fontSize: 13, fontWeight: 700, cursor: 'pointer',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          gap: 8, fontFamily: 'IBM Plex Mono, monospace', color: '#fff',
-          boxShadow: '0 2px 12px rgba(6,182,212,0.25)',
-        }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" />
-            <rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" />
-          </svg>
-          Open Full Dashboard
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-            <polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" />
-          </svg>
-        </button>
-        <p style={{
-          textAlign: 'center', fontSize: 9, color: '#334155',
-          margin: '6px 0 0', letterSpacing: '0.04em',
-        }}>
-          Opens in new tab · AdaptiveSec Web App
-        </p>
+          <button onClick={openFullDashboard} style={{
+            width: '100%', height: 38,
+            background: 'linear-gradient(135deg, #1d4ed8 0%, #0891b2 100%)',
+            borderRadius: 8, border: 'none',
+            fontSize: 13, fontWeight: 700, cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            gap: 8, fontFamily: 'IBM Plex Mono, monospace', color: '#fff',
+            boxShadow: '0 2px 12px rgba(6,182,212,0.25)',
+          }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" />
+              <rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" />
+            </svg>
+            Open Full Dashboard
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+              <polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" />
+            </svg>
+          </button>
+          <p style={{
+            textAlign: 'center', fontSize: 9, color: '#334155',
+            margin: '6px 0 0', letterSpacing: '0.04em',
+          }}>
+            Opens in new tab · AdaptiveSec Web App
+          </p>
         </div>
       </div>
     </div>
