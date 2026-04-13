@@ -2,6 +2,7 @@
     "manifest_version": 3,
     "name": "AdaptiveSec",
     "version": "1.0.0",
+    "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAkzYy2P2FkQi2T7atlty/+wUxexTFVSVrMgMwGS1nRYO4bNlQnjCzJGjNOhhRxIdN08YckSYBbgOShENWvyQloPOPmXAHmFoJvc3S7DchkM/2bt2/AEJ8F9JYoH/dowpayy1Q82nvK/7/wsiBBuwGwqDXsiFFfVg6q3bCCrORDqVwn7d2tKg6rNHLWzfnSFaCwA9hd+KYAldyGi03xp9cR2t2RrZ9yFV5ayuSj94x8fs01myFrk+EELu0eBeYJodwWo1fU/rFl/06xrIZ6vM5kX246lsAhhij4Ne7pvd4oncNdyMKiaHKVDyh45eazm3v6CzwBxBBxWf0fuaHIvWpnwIDAQAB",
     "description": "Phishing detection and security awareness extension",
     "icons": {
         "16": "icons/icon16.png",

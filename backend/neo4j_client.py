@@ -115,13 +115,7 @@ def upsert_user(user_id: str, email: str = "", display_name: str = ""):
             MERGE (u:User {user_id: $user_id})
             SET u.email = $email, u.display_name = $display_name
         """, user_id=user_id, email=email, display_name=display_name)
-    
-if __name__ == "__main__":
-    init_schema()
-    test_vulnerable_to_edge("agent_alex_001", "Urgency", 0.85)
-    test_assigned_training_edge("agent_alex_001", "TM-URG-01")
-    read_user_profile("agent_alex_001")
-    
+
 def assign_training_module(user_id: str, module_id: str, due_date: str):
     with driver.session() as session:
         session.run("""
@@ -133,8 +127,7 @@ def assign_training_module(user_id: str, module_id: str, due_date: str):
                 r.assigned_at = datetime()
         """, user_id=user_id, module_id=module_id, due_date=due_date)
         print(f"ASSIGNED_TRAINING edge created: {user_id} -> {module_id} | due={due_date}")
- 
- 
+
 def get_active_assignment(user_id: str, trigger_name: str) -> str | None:
     trigger_to_module = {
         "Urgency":      "TM-URG-01",
@@ -145,7 +138,7 @@ def get_active_assignment(user_id: str, trigger_name: str) -> str | None:
     module_id = trigger_to_module.get(trigger_name)
     if not module_id:
         return None
- 
+
     with driver.session() as session:
         result = session.run("""
             MATCH (u:User {user_id: $user_id})-[r:ASSIGNED_TRAINING]->(m:TrainingModule {module_id: $module_id})
@@ -154,3 +147,85 @@ def get_active_assignment(user_id: str, trigger_name: str) -> str | None:
         """, user_id=user_id, module_id=module_id)
         record = result.single()
         return record["module_id"] if record else None
+
+# Risk Score Persistence
+
+def persist_risk_score(user_id: str, risk_score: float):
+    """Set current risk_score on User node."""
+    with driver.session() as session:
+        session.run("""
+            MERGE (u:User {user_id: $user_id})
+            SET u.risk_score = $risk_score,
+                u.score_updated_at = datetime()
+        """, user_id=user_id, risk_score=risk_score)
+        print(f"[Neo4j] Persisted risk_score={risk_score} for {user_id}")
+
+def create_score_history(user_id: str, score: float, delta: float, reason: str):
+    """Create a ScoreHistory node linked via HAS_SCORE_HISTORY."""
+    with driver.session() as session:
+        session.run("""
+            MERGE (u:User {user_id: $user_id})
+            CREATE (h:ScoreHistory {
+                score: $score,
+                delta: $delta,
+                reason: $reason,
+                timestamp: datetime()
+            })
+            CREATE (u)-[:HAS_SCORE_HISTORY]->(h)
+        """, user_id=user_id, score=score, delta=delta, reason=reason)
+        print(f"[Neo4j] ScoreHistory created for {user_id}: score={score} delta={delta}")
+
+def get_risk_score(user_id: str) -> float:
+    """Read current risk_score from User node."""
+    with driver.session() as session:
+        result = session.run("""
+            MATCH (u:User {user_id: $user_id})
+            RETURN u.risk_score AS risk_score
+        """, user_id=user_id)
+        record = result.single()
+        return float(record["risk_score"]) if record and record["risk_score"] is not None else 0.0
+
+def get_score_history(user_id: str, range_days: int = 30) -> list:
+    """Return ScoreHistory nodes within the requested time window."""
+    with driver.session() as session:
+        result = session.run("""
+            MATCH (u:User {user_id: $user_id})-[:HAS_SCORE_HISTORY]->(h:ScoreHistory)
+            WHERE h.timestamp >= datetime() - duration({days: $range_days})
+            RETURN h.score AS score, h.delta AS delta,
+                   h.reason AS reason, toString(h.timestamp) AS timestamp
+            ORDER BY h.timestamp DESC
+        """, user_id=user_id, range_days=range_days)
+        return result.data()
+
+# TrainingModule Queries 
+
+def get_training_module(module_id: str) -> dict | None:
+    """Return full metadata for a TrainingModule node."""
+    with driver.session() as session:
+        result = session.run("""
+            MATCH (m:TrainingModule {module_id: $module_id})
+            RETURN m.module_id AS module_id, m.title AS title,
+                   m.video_urls AS video_urls, m.bias_target AS bias_target,
+                   m.duration_seconds AS duration_seconds
+        """, module_id=module_id)
+        record = result.single()
+        return dict(record) if record else None
+
+def get_user_training(user_id: str) -> list:
+    """Return assigned modules with full title and video_urls populated."""
+    with driver.session() as session:
+        result = session.run("""
+            MATCH (u:User {user_id: $user_id})-[r:ASSIGNED_TRAINING]->(m:TrainingModule)
+            RETURN m.module_id AS module_id, m.title AS title,
+                   m.video_urls AS video_urls, m.bias_target AS bias_target,
+                   m.duration_seconds AS duration_seconds,
+                   r.status AS status, r.due_date AS due_date
+            ORDER BY r.assigned_at DESC
+        """, user_id=user_id)
+        return result.data()
+
+if __name__ == "__main__":
+    init_schema()
+    test_vulnerable_to_edge("agent_alex_001", "Urgency", 0.85)
+    test_assigned_training_edge("agent_alex_001", "TM-URG-01")
+    read_user_profile("agent_alex_001")
