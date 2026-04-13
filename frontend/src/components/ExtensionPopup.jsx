@@ -19,6 +19,7 @@ export default function ExtensionPopup() {
   const { user, logout } = useAuth()
   const [risk, setRisk]         = useState(null)
   const [training, setTraining] = useState(null)
+  const [latestAlert, setLatestAlert] = useState(null)
 
   useEffect(() => {
     if (!user) return
@@ -40,7 +41,27 @@ export default function ExtensionPopup() {
         setTraining({ done, total: modules.length, pct })
       })
       .catch(() => {})
-  }, [user])
+      
+      // read latest alert from background script
+      chrome.storage.local.get(['latest_alert'], (result) => {
+        if (result.latest_alert) {
+          setLatestAlert(result.latest_alert)
+        }
+    })
+
+      const storageListener = (changes, area) => {
+        if (area === 'local' && changes.latest_alert) {
+          setLatestAlert(changes.latest_alert.newValue)
+        }
+      }
+
+      chrome.storage.onChanged.addListener(storageListener)
+
+      return () => {
+        chrome.storage.onChanged.removeListener(storageListener)
+      }
+
+      }, [user])
 
   function openFullDashboard() {
     const url = chrome.runtime.getURL('popup.html') + '?full=1'
@@ -150,6 +171,69 @@ export default function ExtensionPopup() {
             <span>0</span><span>50</span><span>100</span>
           </div>
         </div>
+
+        {/* Real-Time Security Alert */}
+        {latestAlert && (
+        <div style={{
+            background: 'rgba(255,165,0,0.08)',
+            border: '1px solid rgba(255,165,0,0.25)',
+            borderRadius: '10px',
+            padding: '16px',
+          }}>
+            <div style={{
+              fontSize: '0.75rem',
+              fontFamily: 'var(--font-mono)',
+              color: 'var(--accent-orange)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.08em',
+              marginBottom: '10px',
+            }}>
+              Recent Security Alert
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div>
+                <strong>Risk Change:</strong> +{latestAlert.score_delta}
+              </div>
+
+              <div>
+                <strong>Cognitive Bias:</strong> {latestAlert.bias_tag}
+              </div>
+
+              <div>
+                <strong>Updated Risk Score:</strong> {latestAlert.risk_score}
+              </div>
+
+            </div>
+
+          <div style={{
+            marginTop: '10px',
+            padding: '10px',
+            borderRadius: '8px',
+            background: 'rgba(255,255,255,0.04)',
+            color: 'var(--text-muted)',
+            lineHeight: '1.5',
+          }}>
+              {latestAlert.explanation}
+            </div>
+            <button
+              onClick={() => chrome.tabs.create({ url: 'http://localhost:5173/training' })}
+              style={{
+                marginTop: '8px',
+                padding: '10px',
+                background: 'linear-gradient(135deg,var(--accent-blue),var(--accent-purple))',
+                border: 'none',
+                borderRadius: '8px',
+                color: '#fff',
+                fontSize: '0.85rem',
+                fontWeight: '600',
+                cursor: 'pointer',
+              }}
+            >
+              Start Training
+            </button>
+              </div>
+          )}
 
         {/* Training Progress */}
         <div style={{
