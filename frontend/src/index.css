@@ -857,12 +857,18 @@ body {
   text-align: center;
 }
 
+.dashboard-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
 /* ── Navbar user section ── */
 .navbar-user {
   display: flex;
   align-items: center;
   gap: 16px;
-  margin-left: auto;
 }
 
 .navbar-welcome {
