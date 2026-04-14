@@ -3,11 +3,9 @@ W4-012: Seed TrainingModule nodes in Neo4j
 Run from backend/ directory: python scripts/seed_training_modules.py
 Can be re-run safely — uses MERGE so no duplicates.
 """
-
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 from neo4j_client import driver
 
 TRAINING_MODULES = [
@@ -17,9 +15,9 @@ TRAINING_MODULES = [
         "bias_target": "Urgency",
         "duration_seconds": 180,
         "video_urls": [
-            "https://youtube.com/shorts/xBTebn3sNlM?feature=share",
-            "https://youtube.com/shorts/kWrLi-ETeME?feature=share",
-            "https://youtube.com/shorts/oXUE3sMOsc4?feature=share",
+            "https://www.youtube.com/embed/xBTebn3sNlM",
+            "https://www.youtube.com/embed/kWrLi-ETeME",
+            "https://www.youtube.com/embed/oXUE3sMOsc4",
         ],
     },
     {
@@ -28,9 +26,9 @@ TRAINING_MODULES = [
         "bias_target": "Authority",
         "duration_seconds": 180,
         "video_urls": [
-            "https://youtube.com/shorts/343eqsob9FE?feature=share",
-            "https://youtube.com/shorts/OeTKw49qgRY?feature=share",
-            "https://youtube.com/shorts/yJim30KCZco?feature=share",
+            "https://www.youtube.com/embed/343eqsob9FE",
+            "https://www.youtube.com/embed/OeTKw49qgRY",
+            "https://www.youtube.com/embed/yJim30KCZco",
         ],
     },
     {
@@ -39,9 +37,9 @@ TRAINING_MODULES = [
         "bias_target": "Scarcity",
         "duration_seconds": 180,
         "video_urls": [
-            "https://youtube.com/shorts/4gj1gJy5Ui8?feature=share",
-            "https://youtube.com/shorts/5XWQicNOuBs?feature=share",
-            "https://youtube.com/shorts/fzRy3aI2BMI?feature=share",
+            "https://www.youtube.com/embed/4gj1gJy5Ui8",
+            "https://www.youtube.com/embed/5XWQicNOuBs",
+            "https://www.youtube.com/embed/fzRy3aI2BMI",
         ],
     },
     {
@@ -50,13 +48,12 @@ TRAINING_MODULES = [
         "bias_target": "Social Proof",
         "duration_seconds": 180,
         "video_urls": [
-            "https://youtube.com/shorts/ef2vtrTSGgo?feature=share",
-            "https://youtube.com/shorts/U0S5GLou0Q8?feature=share",
-            "https://youtube.com/shorts/PkeypxacADg?feature=share",
+            "https://www.youtube.com/embed/ef2vtrTSGgo",
+            "https://www.youtube.com/embed/U0S5GLou0Q8",
+            "https://www.youtube.com/embed/PkeypxacADg",
         ],
     },
 ]
-
 
 def seed_modules():
     with driver.session() as session:
@@ -80,12 +77,10 @@ def seed_modules():
 
     print("\n[Seed] All 4 TrainingModule nodes seeded successfully.")
     print("[Seed] Verifying...")
-
     with driver.session() as session:
-        result = session.run("MATCH (m:TrainingModule) RETURN m.module_id AS id, m.title AS title")
+        result = session.run("MATCH (m:TrainingModule) RETURN m.module_id AS id, m.title AS title, m.content_url AS url")
         for record in result:
-            print(f"  ✅ {record['id']} — {record['title']}")
-
+            print(f"  ✅ {record['id']} — {record['title']} — {record['url']}")
 
 if __name__ == "__main__":
     seed_modules()

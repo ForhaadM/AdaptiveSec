@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../AuthContext'
 import API_BASE from '../apiBase'
 
+const BACKEND = 'http://localhost:8000'
+
 function riskLabel(score) {
   if (score >= 80) return 'CRITICAL RISK'
   if (score >= 60) return 'HIGH RISK'
@@ -16,26 +18,60 @@ function riskLabelClass(score) {
   return 'risk-level-btn risk-low'
 }
 
-export default function RiskScoreWidget() {
+export default function RiskScoreWidget({ userId: propUserId, token: propToken, refreshKey }) {
   const { user } = useAuth()
-  const [data, setData] = useState(null)
+  const userId = propUserId || user?.user_id
+  const token = propToken || user?.token
+  const isAgentView = !!propUserId
+
+  const [displayScore, setDisplayScore] = useState(0)
+  const [activeAlerts, setActiveAlerts] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [lastUpdated, setLastUpdated] = useState(null)
+  const prevScoreRef = useRef(0)
+  const timerRef = useRef(null)
   const wsRef = useRef(null)
 
-  async function loadDashboard() {
-    if (!user?.user_id || !user?.token) return
+  function animateTo(end) {
+    const start = prevScoreRef.current
+    if (start === end) return
+    if (timerRef.current) clearInterval(timerRef.current)
+    const steps = 24
+    const duration = 800
+    let step = 0
+    timerRef.current = setInterval(() => {
+      step++
+      setDisplayScore(Math.round(start + ((end - start) / steps) * step))
+      if (step >= steps) {
+        clearInterval(timerRef.current)
+        setDisplayScore(end)
+        prevScoreRef.current = end
+      }
+    }, duration / steps)
+  }
+
+  async function loadScore() {
+    if (!userId) return
     try {
-      const res = await fetch(`${API_BASE}/api/v1/users/${user.user_id}/dashboard`, {
-        headers: { Authorization: `Bearer ${user.token}` },
-      })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const json = await res.json()
-      setData(json)
+      if (isAgentView) {
+        const res = await fetch(`${BACKEND}/api/v1/admin/agent-scores`)
+        const json = await res.json()
+        const s = Math.round(json.agents?.[userId] ?? 0)
+        animateTo(s)
+      } else {
+        const res = await fetch(`${API_BASE}/api/v1/users/${userId}/dashboard`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const json = await res.json()
+        const s = Math.round(json.risk_score ?? 0)
+        animateTo(s)
+        setActiveAlerts(json.active_alerts ?? 0)
+      }
       setLastUpdated(new Date())
       setError(null)
-    } catch (err) {
+    } catch {
       setError('Failed to load risk score.')
     } finally {
       setLoading(false)
@@ -43,46 +79,41 @@ export default function RiskScoreWidget() {
   }
 
   function initWebSocket() {
-    if (!user?.user_id || !user?.token) return
-    const wsBase = API_BASE ? API_BASE.replace('http', 'ws') : ''
-    const wsUrl = `${wsBase}/ws/v1/alerts/${user.user_id}?token=${user.token}`
-    const ws = new WebSocket(wsUrl)
+    if (isAgentView || !userId || !token) return
+    const wsBase = API_BASE ? API_BASE.replace('http', 'ws') : 'ws://localhost:8000'
+    const ws = new WebSocket(`${wsBase}/ws/v1/alerts/${userId}?token=${token}`)
     wsRef.current = ws
-
     ws.onmessage = (event) => {
       try {
         const msg = JSON.parse(event.data)
         if (msg.type === 'risk_update' && msg.risk_score !== undefined) {
-          setData(prev => prev ? {
-            ...prev,
-            risk_score: msg.risk_score,
-            risk_label: riskLabel(msg.risk_score).replace(/ RISK$/, ''),
-          } : prev)
+          animateTo(Math.round(msg.risk_score))
           setLastUpdated(new Date())
         }
-      } catch {
-        // non-JSON keep-alive frames — ignore
-      }
+      } catch { }
     }
-
     ws.onclose = () => {
-      // Reconnect after 5 s if the component is still mounted
-      setTimeout(() => {
-        if (wsRef.current === ws) initWebSocket()
-      }, 5000)
+      setTimeout(() => { if (wsRef.current === ws) initWebSocket() }, 5000)
     }
   }
 
   useEffect(() => {
-    loadDashboard()
+    loadScore()
     initWebSocket()
     return () => {
-      if (wsRef.current) {
-        wsRef.current.onclose = null  // prevent reconnect loop on unmount
-        wsRef.current.close()
-      }
+      if (timerRef.current) clearInterval(timerRef.current)
+      if (wsRef.current) { wsRef.current.onclose = null; wsRef.current.close() }
     }
-  }, [user?.user_id])
+  }, [userId])
+
+  // Re-fetch when refreshKey changes (after simulation)
+  useEffect(() => {
+    if (refreshKey > 0) {
+      // Fetch immediately then again after pipeline processes
+      loadScore()
+      setTimeout(() => loadScore(), 3500)
+    }
+  }, [refreshKey])
 
   function formatLastUpdated(date) {
     if (!date) return ''
@@ -92,59 +123,33 @@ export default function RiskScoreWidget() {
     return date.toLocaleTimeString()
   }
 
-  if (loading) {
-    return (
-      <div className="card risk-widget">
-        <div className="card-header"><span className="card-title">Risk Score</span></div>
-        <div className="loading-spinner" style={{ margin: '32px auto' }} />
-      </div>
-    )
-  }
+  if (loading) return (
+    <div className="card risk-widget">
+      <div className="card-header"><span className="card-title">Risk Score</span></div>
+      <div className="loading-spinner" style={{ margin: '32px auto' }} />
+    </div>
+  )
 
-  if (error) {
-    return (
-      <div className="card risk-widget">
-        <div className="card-header"><span className="card-title">Risk Score</span></div>
-        <p className="error-message" style={{ padding: '24px', color: 'var(--risk-high)' }}>{error}</p>
-      </div>
-    )
-  }
-
-  if (!data) {
-    return (
-      <div className="card risk-widget">
-        <div className="card-header"><span className="card-title">Risk Score</span></div>
-        <p style={{ padding: '24px', color: 'var(--text-muted)' }}>No risk data yet.</p>
-      </div>
-    )
-  }
-
-  const score = data.risk_score ?? 0
-  const barWidth = `${score}%`
+  if (error) return (
+    <div className="card risk-widget">
+      <div className="card-header"><span className="card-title">Risk Score</span></div>
+      <p style={{ padding: '24px', color: 'var(--risk-high)' }}>{error}</p>
+    </div>
+  )
 
   return (
     <div className="card risk-widget">
-      <div className="card-header">
-        <span className="card-title">Risk Score</span>
-      </div>
-
-      <div className="risk-score-value">{score}</div>
-      <div className={riskLabelClass(score)}>{riskLabel(score)}</div>
-
+      <div className="card-header"><span className="card-title">Risk Score</span></div>
+      <div className="risk-score-value" style={{ transition: 'color 0.4s' }}>{displayScore}</div>
+      <div className={riskLabelClass(displayScore)}>{riskLabel(displayScore)}</div>
       <div className="risk-bar-container">
         <div className="risk-bar">
-          <div className="risk-bar-fill" style={{ width: barWidth }} />
+          <div className="risk-bar-fill" style={{ width: `${displayScore}%`, transition: 'width 0.8s cubic-bezier(0.4,0,0.2,1)' }} />
         </div>
       </div>
-
       <div className="risk-scale">
-        <span>0</span>
-        <span>25</span>
-        <span>50</span>
-        <span>75</span>
-        <span>100</span>
+        <span>0</span><span>25</span><span>50</span><span>75</span><span>100</span>
       </div>
-
       <div className="risk-footer">
         <div className="risk-change">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -152,7 +157,9 @@ export default function RiskScoreWidget() {
             <polyline points="17 6 23 6 23 12"></polyline>
           </svg>
           <span style={{ paddingLeft: '4px' }}>
-            {data.active_alerts > 0 ? `${data.active_alerts} active alert${data.active_alerts > 1 ? 's' : ''}` : 'No active alerts'}
+            {isAgentView
+              ? (displayScore === 0 ? 'No activity yet' : `Score: ${displayScore}/100`)
+              : (activeAlerts > 0 ? `${activeAlerts} active alert${activeAlerts > 1 ? 's' : ''}` : 'No active alerts')}
           </span>
         </div>
         <span className="risk-time">{formatLastUpdated(lastUpdated)}</span>

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '../AuthContext'
 import API_BASE from '../apiBase'
 
+const BACKEND = 'http://localhost:8000'
 const VISIBLE_BY_DEFAULT = 5
 
 function classifyType(reason) {
@@ -22,10 +23,7 @@ function cognitiveTag(reason) {
 }
 
 function buildTitle(entry) {
-  if (entry.type === 'Training') {
-    const moduleId = entry.reason.replace('training_completed:', '')
-    return `Risk score reduced after completing module ${moduleId}`
-  }
+  if (entry.type === 'Training') return `Risk score reduced after completing module ${entry.reason.replace('training_completed:', '')}`
   if (entry.delta > 0) return `Risk score increased — ${entry.cognitiveTag} trigger detected`
   return `Risk score decreased — positive behaviour recorded`
 }
@@ -42,7 +40,6 @@ function EntryIcon({ delta, type }) {
   if (isThreat) iconClass += ' sce-icon--threat'
   else if (isPositive) iconClass += ' sce-icon--positive'
   else iconClass += ' sce-icon--negative'
-
   return (
     <div className={iconClass}>
       {isPositive ? (
@@ -61,13 +58,7 @@ function EntryIcon({ delta, type }) {
 }
 
 function TypeBadge({ type }) {
-  const classMap = {
-    Training: 'sce-type-badge--training',
-    Alert: 'sce-type-badge--alert',
-    Threat: 'sce-type-badge--threat',
-    Behavior: 'sce-type-badge--behavior',
-    Event: 'sce-type-badge--behavior',
-  }
+  const classMap = { Training: 'sce-type-badge--training', Alert: 'sce-type-badge--alert', Threat: 'sce-type-badge--threat', Behavior: 'sce-type-badge--behavior', Event: 'sce-type-badge--behavior' }
   return <span className={`sce-type-badge ${classMap[type] ?? ''}`}>{type}</span>
 }
 
@@ -85,13 +76,10 @@ function formatRelativeTime(isoString) {
 function ScoreChangeEntry({ entry }) {
   const isPositive = entry.delta > 0
   const deltaLabel = isPositive ? `+${entry.delta}` : `−${Math.abs(entry.delta)}`
-
   return (
     <div className="sce-entry-card">
       <div className="sce-entry">
-        <div className="sce-entry-left">
-          <EntryIcon delta={entry.delta} type={entry.type} />
-        </div>
+        <div className="sce-entry-left"><EntryIcon delta={entry.delta} type={entry.type} /></div>
         <div className="sce-entry-body">
           <div className="sce-entry-top">
             <div className={`sce-delta ${isPositive ? 'sce-delta--positive' : 'sce-delta--negative'}`}>
@@ -112,37 +100,55 @@ function ScoreChangeEntry({ entry }) {
   )
 }
 
-export default function ScoreChangeExplanations() {
+export default function ScoreChangeExplanations({ userId: propUserId, token: propToken, refreshKey }) {
   const { user } = useAuth()
+  const userId = propUserId || user?.user_id
+  const token = propToken || user?.token
+  const isAgentView = !!propUserId
+
   const [entries, setEntries] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [showAll, setShowAll] = useState(false)
 
-  useEffect(() => {
-    if (!user?.user_id || !user?.token) return
-    fetch(`${API_BASE}/api/v1/users/${user.user_id}/risk-history?range=all`, {
-      headers: { Authorization: `Bearer ${user.token}` },
-    })
-      .then(res => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json() })
-      .then(json => {
-        const points = [...(json.data_points || [])].reverse()  // most recent first
-        const built = points
-          .filter(p => p.delta !== 0)
-          .map((p, i) => {
-            const type = classifyType(p.reason)
-            const tag = cognitiveTag(p.reason)
-            const entry = { id: i, score: p.score, delta: p.delta, reason: p.reason, timestamp: p.timestamp, type, cognitiveTag: tag }
-            entry.title = buildTitle(entry)
-            entry.counterfactual = buildCounterfactual(entry)
-            return entry
-          })
-        setEntries(built)
-        setError(null)
-      })
-      .catch(() => setError('Failed to load score changes.'))
-      .finally(() => setLoading(false))
-  }, [user?.user_id])
+  async function loadHistory() {
+    if (!userId) return
+    setLoading(true)
+    try {
+      let url, headers
+      if (isAgentView) {
+        url = `${BACKEND}/api/v1/admin/agent-history/${userId}?range=all`
+        headers = {}
+      } else {
+        url = `${API_BASE}/api/v1/users/${userId}/risk-history?range=all`
+        headers = { Authorization: `Bearer ${token}` }
+      }
+
+      const res = await fetch(url, { headers })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const json = await res.json()
+      const points = [...(json.data_points || [])].reverse()
+      const built = points
+        .filter(p => p.delta !== 0)
+        .map((p, i) => {
+          const type = classifyType(p.reason)
+          const tag = cognitiveTag(p.reason)
+          const entry = { id: i, score: p.score, delta: p.delta, reason: p.reason, timestamp: p.timestamp, type, cognitiveTag: tag }
+          entry.title = buildTitle(entry)
+          entry.counterfactual = buildCounterfactual(entry)
+          return entry
+        })
+      setEntries(built)
+      setError(null)
+    } catch {
+      setError('Failed to load score changes.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { loadHistory() }, [userId])
+  useEffect(() => { if (refreshKey > 0) loadHistory() }, [refreshKey])
 
   const visible = showAll ? entries : entries.slice(0, VISIBLE_BY_DEFAULT)
 
@@ -158,22 +164,15 @@ export default function ScoreChangeExplanations() {
           </div>
         )}
       </div>
-
       {loading ? (
-        <div style={{ display: 'flex', justifyContent: 'center', padding: '24px' }}>
-          <div className="loading-spinner" />
-        </div>
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '24px' }}><div className="loading-spinner" /></div>
       ) : error ? (
         <p style={{ padding: '16px', color: 'var(--risk-high)' }}>{error}</p>
       ) : entries.length === 0 ? (
-        <p style={{ padding: '16px', color: 'var(--text-muted)' }}>
-          No score changes yet. Changes will appear here after phishing simulations or completed training.
-        </p>
+        <p style={{ padding: '16px', color: 'var(--text-muted)' }}>No score changes yet. Changes will appear here after phishing simulations or completed training.</p>
       ) : (
         <div className="sce-feed">
-          {visible.map(entry => (
-            <ScoreChangeEntry key={entry.id} entry={entry} />
-          ))}
+          {visible.map(entry => <ScoreChangeEntry key={entry.id} entry={entry} />)}
         </div>
       )}
     </div>

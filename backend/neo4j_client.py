@@ -22,6 +22,18 @@ def init_schema():
         session.run("MERGE (:CognitiveTrigger {name: 'Social Proof'})")
         print("Schema initialized successfully")
 
+def increment_video_index(user_id: str, module_id: str):
+    """Increment video_index on ASSIGNED_TRAINING edge, max 2 (0,1,2 for 3 videos)."""
+    with driver.session() as session:
+        session.run("""
+            MATCH (u:User {user_id: $user_id})-[r:ASSIGNED_TRAINING]->(m:TrainingModule {module_id: $module_id})
+            SET r.video_index = CASE
+                WHEN coalesce(r.video_index, 0) >= 2 THEN 2
+                ELSE coalesce(r.video_index, 0) + 1
+            END
+        """, user_id=user_id, module_id=module_id)
+        print(f"[Neo4j] Incremented video_index for {user_id} -> {module_id}")
+
 def test_vulnerable_to_edge(user_id: str, trigger: str, bias_score: float):
     with driver.session() as session:
         session.run("""
@@ -212,14 +224,16 @@ def get_training_module(module_id: str) -> dict | None:
         return dict(record) if record else None
 
 def get_user_training(user_id: str) -> list:
-    """Return assigned modules with full title and video_urls populated."""
     with driver.session() as session:
         result = session.run("""
             MATCH (u:User {user_id: $user_id})-[r:ASSIGNED_TRAINING]->(m:TrainingModule)
             RETURN m.module_id AS module_id, m.title AS title,
                    m.video_urls AS video_urls, m.bias_target AS bias_target,
                    m.duration_seconds AS duration_seconds,
-                   r.status AS status, r.due_date AS due_date
+                   r.status AS status, r.due_date AS due_date,
+                   coalesce(r.video_index, 0) AS video_index,
+                   coalesce(r.progress, 0) AS progress,
+                   coalesce(r.completed, false) AS completed
             ORDER BY r.assigned_at DESC
         """, user_id=user_id)
         return result.data()

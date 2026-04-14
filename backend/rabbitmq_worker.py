@@ -13,7 +13,7 @@ from ml_pipeline.cognitive_model import CognitiveModel
 from ml_pipeline.explanation_generator import ExplanationGenerator
 from neo4j_client import (
     update_trigger_weight, assign_training_module,
-    get_active_assignment, persist_risk_score, create_score_history
+    get_active_assignment, persist_risk_score, create_score_history, increment_video_index, get_risk_score
 )
 
 logger = logging.getLogger(__name__)
@@ -72,21 +72,22 @@ def process_event(body):
     page_context = sanitized.get("page_context", "")
     event_id = event.get("event_id", str(uuid.uuid4()))
 
-    # AC1 + AC2 + AC6 — Persist score to Neo4j and cache in Redis
+# AC1 + AC2 + AC6 — Persist score to Neo4j and cache in Redis
     try:
-        persist_risk_score(user_id, threat_score)
+        current_score = get_risk_score(user_id)
+        new_score = min(100.0, current_score + risk_delta)
+        persist_risk_score(user_id, new_score)
         create_score_history(
             user_id=user_id,
-            score=threat_score,
+            score=new_score,
             delta=risk_delta,
             reason=raw_trigger or "unknown"
         )
         r = redis.from_url(os.getenv("REDIS_URL", "redis://localhost:6379"))
-        r.setex(f"risk_score:{user_id}", 60, str(threat_score))
-        print(f"[Worker] Score persisted and cached for {user_id}: {threat_score}")
+        r.setex(f"risk_score:{user_id}", 60, str(new_score))
+        print(f"[Worker] Score persisted and cached for {user_id}: {new_score}")
     except Exception as e:
-        logger.warning(f"[Worker] Score persist failed: {e}")
-
+                logger.warning(f"[Worker] Score persist failed: {e}")
     # Resolve schema trigger and assigned module
     schema_trigger = None
     new_training_id = None
@@ -107,7 +108,8 @@ def process_event(body):
                     print(f"Assigned training: {user_id} -> {module_id} due={due_date}")
             else:
                 new_training_id = existing
-                print(f"Training already assigned: {user_id} -> {existing}")
+                increment_video_index(user_id, existing)
+                print(f"Training already assigned: {user_id} -> {existing}, video index incremented")
         else:
             print(f"Unknown trigger type: {raw_trigger}, skipping Neo4j update")
     else:
