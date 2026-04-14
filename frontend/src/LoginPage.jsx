@@ -2,11 +2,33 @@ import { useState } from 'react'
 import { useAuth } from './AuthContext'
 
 const BACKEND_URL = 'http://localhost:8000'
+const inExtension = typeof chrome !== 'undefined' && !!chrome?.identity
 
 export default function LoginPage() {
   const { login } = useAuth()
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [devUserId, setDevUserId] = useState('agent_rushed_001')
+
+  async function handleDevLogin() {
+    setError('')
+    setLoading(true)
+    try {
+      const res = await fetch(`${BACKEND_URL}/auth/token?user_id=${encodeURIComponent(devUserId)}`, {
+        method: 'POST',
+      })
+      if (!res.ok) {
+        setError('Dev login failed. Is the backend running?')
+        return
+      }
+      const data = await res.json()
+      login({ ...data, name: devUserId, email: `${devUserId}@dev.local` })
+    } catch {
+      setError('Could not reach the backend at localhost:8000.')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   async function handleGoogleLogin() {
     setError('')
@@ -82,6 +104,49 @@ export default function LoginPage() {
             {loading ? 'Signing in…' : 'Sign in with Google'}
           </button>
         </div>
+
+        {!inExtension && (
+          <div style={{ marginTop: '24px', borderTop: '1px solid #2d3748', paddingTop: '20px' }}>
+            <p style={{ fontSize: '11px', color: '#64748b', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Dev mode (localhost only)
+            </p>
+            <input
+              type="text"
+              value={devUserId}
+              onChange={e => setDevUserId(e.target.value)}
+              placeholder="Enter any user_id"
+              style={{
+                width: '100%',
+                padding: '8px 10px',
+                background: '#1e293b',
+                border: '1px solid #334155',
+                borderRadius: '4px',
+                color: '#e2e8f0',
+                fontSize: '13px',
+                fontFamily: 'monospace',
+                marginBottom: '8px',
+                boxSizing: 'border-box',
+              }}
+            />
+            <button
+              onClick={handleDevLogin}
+              disabled={loading || !devUserId.trim()}
+              style={{
+                width: '100%',
+                padding: '8px',
+                background: '#1e40af',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '4px',
+                fontSize: '13px',
+                cursor: loading ? 'not-allowed' : 'pointer',
+                opacity: loading ? 0.7 : 1,
+              }}
+            >
+              {loading ? 'Logging in…' : 'Login as this user'}
+            </button>
+          </div>
+        )}
 
         {error && <p className="login-error">{error}</p>}
       </div>

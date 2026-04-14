@@ -66,13 +66,15 @@ def seed_modules():
                 SET m.title = $title,
                     m.bias_target = $bias_target,
                     m.duration_seconds = $duration_seconds,
-                    m.video_urls = $video_urls
+                    m.video_urls = $video_urls,
+                    m.content_url = $content_url
             """,
                 module_id=module["module_id"],
                 title=module["title"],
                 bias_target=module["bias_target"],
                 duration_seconds=module["duration_seconds"],
                 video_urls=module["video_urls"],
+                content_url=module["video_urls"][0],
             )
             print(f"[Seed] Upserted {module['module_id']}: {module['title']}")
 

@@ -14,26 +14,23 @@ export default function DashboardLayout() {
   return (
     <div className="dashboard-layout">
       <main className="main-wrapper">
-        <header className="top-navbar" style={{ position: 'relative' }}>
-          <div className="navbar-user">
+        <section className="main-content">
+          <div className="dashboard-topbar">
             <span style={{ fontSize: '1.15rem', fontWeight: '500', letterSpacing: '-0.01em', background: 'linear-gradient(90deg, #a0aec0, #cbd5e0, var(--accent-blue) 80%, var(--accent-purple))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
               Welcome, {user?.name}
             </span>
+            <button className="logout-btn" onClick={logout}>Sign out</button>
           </div>
-          <button className="logout-btn" onClick={logout} style={{ position: 'absolute', top: '12px', right: '24px' }}>Sign out</button>
-        </header>
-
-        <section className="main-content">
           <div className="dashboard-header">
             <h1 className="dashboard-title"><strong>Security</strong> Dashboard</h1>
             <p className="dashboard-subtitle">Monitor your posture · Complete assigned training · Understand your risk</p>
           </div>
 
           <div className="grid-layout">
-            <RiskScoreWidget score={riskScore} />
+            <RiskScoreWidget />
             <CognitiveProfileCard />
             <ScoreChangeExplanations />
-            <TrainingProgressSection userId={user?.user_id} onScoreUpdate={setRiskScore} />
+            <TrainingProgressSection />
             <HistoryChart />
           </div>
         </section>

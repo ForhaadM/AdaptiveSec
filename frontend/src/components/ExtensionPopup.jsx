@@ -202,6 +202,14 @@ export default function ExtensionPopup() {
       {/* ── Scrollable body ── */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '14px 16px 0' }}>
 
+        {/* ── Welcome ── */}
+        <div style={{ marginBottom: 12 }}>
+          <span style={{ fontSize: 11, color: '#64748b' }}>Welcome back, </span>
+          <span style={{ fontSize: 11, color: '#e2e8f0', fontWeight: 600 }}>
+            {user?.name || user?.email?.split('@')[0] || 'User'}
+          </span>
+        </div>
+
         {/* ── JIT Nudge ── */}
         {nudge && (
           <div style={{
@@ -270,14 +278,6 @@ export default function ExtensionPopup() {
             </div>
           </div>
         )}
-
-        {/* ── Welcome ── */}
-        <div style={{ marginBottom: 12 }}>
-          <span style={{ fontSize: 11, color: '#64748b' }}>Welcome back, </span>
-          <span style={{ fontSize: 11, color: '#e2e8f0', fontWeight: 600 }}>
-            {user?.name || user?.email?.split('@')[0] || 'User'}
-          </span>
-        </div>
 
         {/* ── Risk score ── */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 18, marginBottom: 16 }}>
