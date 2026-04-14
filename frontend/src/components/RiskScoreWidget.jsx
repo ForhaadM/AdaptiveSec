@@ -1,16 +1,16 @@
-export default function RiskScoreWidget() {
+export default function RiskScoreWidget({ score = 58 }) {
   return (
     <div className="card risk-widget">
       <div className="card-header">
         <span className="card-title">Risk Score</span>
       </div>
       
-      <div className="risk-score-value">58</div>
+      <div className="risk-score-value">{score}</div>
       <div className="risk-level-btn">HIGH RISK</div>
       
       <div className="risk-bar-container">
         <div className="risk-bar">
-          <div className="risk-bar-fill"></div>
+          <div className="risk-bar-fill" style={{ width: `${score}%` }}></div>
         </div>
       </div>
       
