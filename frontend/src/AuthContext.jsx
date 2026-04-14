@@ -2,12 +2,42 @@ import { createContext, useContext, useState, useEffect } from 'react'
 
 const AuthContext = createContext(null)
 
+const inExtension = typeof chrome !== 'undefined' && !!chrome?.storage?.local
+
+function storageGet(keys) {
+  return new Promise(resolve => {
+    if (inExtension) {
+      chrome.storage.local.get(keys, resolve)
+    } else {
+      const result = {}
+      keys.forEach(k => { result[k] = localStorage.getItem(k) })
+      resolve(result)
+    }
+  })
+}
+
+function storageSet(obj) {
+  if (inExtension) {
+    chrome.storage.local.set(obj)
+  } else {
+    Object.entries(obj).forEach(([k, v]) => localStorage.setItem(k, v))
+  }
+}
+
+function storageRemove(keys) {
+  if (inExtension) {
+    chrome.storage.local.remove(keys)
+  } else {
+    keys.forEach(k => localStorage.removeItem(k))
+  }
+}
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    chrome.storage.local.get(['token', 'user_id', 'user_name', 'user_email'], (result) => {
+    storageGet(['token', 'user_id', 'user_name', 'user_email']).then(result => {
       if (result.token && result.user_id) {
         setUser({
           token: result.token,
@@ -21,7 +51,7 @@ export function AuthProvider({ children }) {
   }, [])
 
   function login(data) {
-    chrome.storage.local.set({
+    storageSet({
       token: data.access_token,
       user_id: data.user_id,
       user_name: data.name,
@@ -36,7 +66,7 @@ export function AuthProvider({ children }) {
   }
 
   function logout() {
-    chrome.storage.local.remove(['token', 'user_id', 'user_name', 'user_email'])
+    storageRemove(['token', 'user_id', 'user_name', 'user_email'])
     setUser(null)
   }
 

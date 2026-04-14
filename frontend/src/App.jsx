@@ -4,7 +4,8 @@ import ExtensionPopup from './components/ExtensionPopup'
 import LoginPage from './LoginPage'
 import './index.css'
 
-const isFullMode = new URLSearchParams(window.location.search).get('full') === '1'
+const inExtension = typeof chrome !== 'undefined' && !!chrome?.runtime?.id
+const isFullMode = !inExtension || new URLSearchParams(window.location.search).get('full') === '1'
 
 function AppContent() {
   const { user, loading } = useAuth()

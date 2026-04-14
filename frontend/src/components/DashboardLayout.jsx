@@ -28,7 +28,7 @@ export default function DashboardLayout() {
             <RiskScoreWidget />
             <CognitiveProfileCard />
             <ScoreChangeExplanations />
-            <TrainingProgressSection userId={user?.user_id} />
+            <TrainingProgressSection />
             <HistoryChart />
           </div>
         </section>
