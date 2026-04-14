@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useAuth } from '../AuthContext'
 import RiskScoreWidget from './RiskScoreWidget'
 import HistoryChart from './HistoryChart'
@@ -8,6 +9,7 @@ import ScoreChangeExplanations from './ScoreChangeExplanations'
 export default function DashboardLayout() {
   // user contains { user_id, name, email, token } set after Google sign-in
   const { user, logout } = useAuth()
+  const [riskScore, setRiskScore] = useState(58)
 
   return (
     <div className="dashboard-layout">

@@ -7,6 +7,9 @@ export default function TrainingProgressSection() {
   const [modules, setModules] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [selectedModule, setSelectedModule] = useState(null);
+  const [moduleDetail, setModuleDetail] = useState(null);
+  const [isDetailLoading, setIsDetailLoading] = useState(false);
 
   useEffect(() => {
     if (!user?.user_id || !user?.token) return
@@ -44,6 +47,47 @@ export default function TrainingProgressSection() {
       .finally(() => setLoading(false))
   }, [user?.user_id])
 
+  const handleModuleClick = async (module) => {
+    setSelectedModule(module)
+    setIsDetailLoading(true)
+    setModuleDetail(null)
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/training/${module.id}`, {
+        headers: { Authorization: `Bearer ${user.token}` },
+      })
+      if (!res.ok) throw new Error('Failed to fetch detail')
+      const detail = await res.json()
+      setModuleDetail(detail)
+    } catch {
+      setModuleDetail({
+        title: module.title,
+        category: module.category,
+        bias_target: module.category,
+        estimated_duration: '10 mins',
+        content_url: 'https://archive.org/embed/BigBuckBunny_124'
+      })
+    } finally {
+      setIsDetailLoading(false)
+    }
+  }
+
+  const handleComplete = async () => {
+    if (!selectedModule) return
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/users/${user?.user_id}/training/${selectedModule.id}/complete`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${user.token}` },
+      })
+      if (!res.ok) throw new Error('Completion failed')
+    } catch {
+      // silent fail
+    }
+    setModules(prev => prev.map(m =>
+      m.id === selectedModule.id ? { ...m, status: 'complete', progress: 100 } : m
+    ))
+    setSelectedModule(prev => ({ ...prev, status: 'complete' }))
+  }
+
   const completedCount = modules.filter(m => m.status === 'complete').length
   const totalCount = modules.length
   const overallProgress = totalCount > 0
@@ -79,7 +123,7 @@ export default function TrainingProgressSection() {
       ) : (
         <div className="training-list">
           {modules.map(module => (
-            <div key={module.id} className={`training-item ${module.status}`}>
+            <div key={module.id} className={`training-item ${module.status}`} onClick={() => handleModuleClick(module)}>
               <div className="training-icon">
                 {module.status === 'complete' && (
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-green)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -133,6 +177,60 @@ export default function TrainingProgressSection() {
       <button className="risk-level-btn btn-full-width mt-4">
         Browse All Courses
       </button>
+
+      {/* Modal Overlay */}
+      {selectedModule && (
+        <div className="modal-overlay" onClick={() => setSelectedModule(null)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="modal-title-group">
+                <h3>{selectedModule.title}</h3>
+                <div className="modal-category">{selectedModule.category}</div>
+              </div>
+              <button className="modal-close-btn" onClick={() => setSelectedModule(null)}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            </div>
+            
+            <div className="modal-body">
+              {isDetailLoading ? (
+                <p style={{textAlign: 'center', color: 'var(--text-muted)'}}>Loading module content...</p>
+              ) : moduleDetail ? (
+                <>
+                  <div className="modal-meta">
+                    <span><strong>Bias Target:</strong> {moduleDetail.bias_target}</span>
+                    <span><strong>Duration:</strong> {moduleDetail.estimated_duration}</span>
+                  </div>
+                  
+                  <div className="video-container">
+                    <iframe 
+                      src={moduleDetail.content_url} 
+                      title={moduleDetail.title}
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                      allowFullScreen
+                    ></iframe>
+                  </div>
+                </>
+              ) : (
+                <p style={{textAlign: 'center', color: 'var(--risk-high)'}}>Failed to load module details.</p>
+              )}
+            </div>
+
+            <div className="modal-footer">
+              <button 
+                className="btn-primary" 
+                onClick={handleComplete} 
+                disabled={selectedModule.status === 'complete' || isDetailLoading}
+              >
+                {selectedModule.status === 'complete' ? 'Completed' : 'Mark as Complete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
