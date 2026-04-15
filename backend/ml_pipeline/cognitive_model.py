@@ -52,6 +52,8 @@ _KEYWORD_MAP: dict[str, list[str]] = {
 }
 
 
+_MAX_KEYWORDS_PER_CLASS = 5
+
 class CognitiveModelError(Exception):
     pass
 
@@ -74,20 +76,35 @@ class CognitiveModel:
             )
 
     def tag_trigger(self, page_context: str) -> dict[str, Any]:
+        """
+        Classify the dominant cognitive trigger and return both the label
+        and a bias_score (0.0-1.0) representing trigger intensity.
+ 
+        Returns:
+            {
+                "cognitive_trigger": "Urgency_Bias",
+                "bias_score": 0.72
+            }
+ 
+        The CognitiveModel NLP layer independently analyzes
+        the page content to confirm and score the psychological mechanism,
+        providing the bias_score weighting that drives the vulnerability
+        profile update.
+        """
         if not page_context or not page_context.strip():
-            return {"cognitive_trigger": "None"}
+            return {"cognitive_trigger": "None", "bias_score": 0.0}
 
         if self._gemini_available:
             try:
                 label = self._classify_with_gemini(page_context.strip())
                 logger.info("CognitiveModel | gemini | trigger=%s | context_len=%d", label, len(page_context))
-                return {"cognitive_trigger": label}
+                return {"cognitive_trigger": label, "bias_score": bias_score}
             except Exception as exc:
                 logger.warning("Gemini API error: %s — falling back to keyword classifier.", exc)
 
-        label = self._classify_with_keywords(page_context.strip())
+        label, bias_score = self._classify_with_keywords(page_context.strip())
         logger.info("CognitiveModel | keyword_fallback | trigger=%s | context_len=%d", label, len(page_context))
-        return {"cognitive_trigger": label}
+        return {"cognitive_trigger": label, "bias_score": bias_score}
 
     def _classify_with_gemini(self, text: str) -> str:
         import urllib.request
@@ -122,17 +139,22 @@ class CognitiveModel:
             "You are a cognitive bias classifier for a cybersecurity training platform.",
             "",
             "Classify the dominant psychological manipulation tactic in the email text.",
-            "Return EXACTLY one of these labels — nothing else:",
+            "Return EXACTLY one label and one integer score (0-10) on a single line separated by a pipe.",
+            "Format: LABEL|SCORE",
+            "",
+            "Labels:",
             "  Urgency_Bias       — time pressure, deadlines, account expiry warnings",
             "  Authority_Bias     — impersonates IT, HR, management, software vendors",
             "  Scarcity_Bias      — limited availability, seats/slots running out",
             "  Social_Proof_Bias  — colleagues already did this, peer pressure",
             "  None               — no clear dominant manipulation tactic",
             "",
+            "Score: 0 = very weak signal, 10 = extremely strong signal.",
+            "",
             "Rules:",
-            "- Return ONLY the label. No explanation. No punctuation.",
+            "- Return ONLY: LABEL|SCORE. No explanation. Nothing else.",
             "- If two tactics apply, return the stronger one.",
-            "- If unsure, return None.",
+            "- If unsure, return None|0.",
             "",
             "Examples:",
         ]
@@ -140,21 +162,43 @@ class CognitiveModel:
         for trigger_label, examples in self._few_shot_examples.items():
             for example_text in examples:
                 lines.append(f'Text: "{example_text}"')
-                lines.append(f"Label: {trigger_label}")
+                lines.append(f"Response: {trigger_label}|8")
                 lines.append("")
 
         lines.append(f'Text: "{text}"')
-        lines.append("Label:")
+        lines.append("Response:")
 
         return "\n".join(lines)
 
-    def _parse_label(self, raw_text: str) -> str:
+    def _parse_label_and_score(self, raw_text: str) -> tuple[str, float]:
+        """
+        Parse 'Urgency_Bias|8' format from Gemini into (label, bias_score).
+        bias_score is normalized from 0-10 to 0.0-1.0.
+        Falls back to just parsing the label if format is unexpected.
+        """
         cleaned = raw_text.strip().strip("`").strip("*").strip()
-
-        if cleaned in VALID_TRIGGERS:
-            return cleaned
-
-        lower = cleaned.lower().replace(" ", "_")
+ 
+        if "|" in cleaned:
+            parts = cleaned.split("|", 1)
+            label_raw  = parts[0].strip()
+            score_raw  = parts[1].strip()
+            label      = self._normalize_label(label_raw)
+            try:
+                raw_score  = float(score_raw)
+                bias_score = round(min(1.0, max(0.0, raw_score / 10.0)), 2)
+            except ValueError:
+                bias_score = 0.5
+            return label, bias_score
+ 
+        # Fallback: just a label, default bias_score to 0.5
+        label = self._normalize_label(cleaned)
+        return label, 0.5 if label != "None" else 0.0
+ 
+    def _normalize_label(self, raw: str) -> str:
+        if raw in VALID_TRIGGERS:
+            return raw
+ 
+        lower = raw.lower().replace(" ", "_")
         normalization = {
             "urgency_bias":       "Urgency_Bias",
             "authority_bias":     "Authority_Bias",
@@ -165,9 +209,9 @@ class CognitiveModel:
         }
         if lower in normalization:
             return normalization[lower]
-
+ 
         partial = {
-            "urgency":  "Urgency_Bias",
+            "urgency":   "Urgency_Bias",
             "authority": "Authority_Bias",
             "scarcity":  "Scarcity_Bias",
             "social":    "Social_Proof_Bias",
@@ -175,60 +219,69 @@ class CognitiveModel:
         for key, label in partial.items():
             if key in lower:
                 return label
-
-        logger.warning("Unrecognized Gemini label '%s' — defaulting to None.", raw_text)
+ 
+        logger.warning("Unrecognized Gemini label '%s' — defaulting to None.", raw)
         return "None"
-
-    def _classify_with_keywords(self, text: str) -> str:
+ 
+    def _classify_with_keywords(self, text: str) -> tuple[str, float]:
+        """
+        Keyword fallback. Returns (label, bias_score).
+        bias_score is derived from match count normalized to 0.0-1.0.
+        """
         text_lower = text.lower()
         scores: dict[str, int] = {}
-
+ 
         for trigger, keywords in _KEYWORD_MAP.items():
             score = sum(1 for kw in keywords if kw in text_lower)
             if score > 0:
                 scores[trigger] = score
-
+ 
         if not scores:
-            return "None"
-
-        return max(scores, key=lambda k: scores[k])
-
+            return "None", 0.0
+ 
+        winner     = max(scores, key=lambda k: scores[k])
+        raw_score  = scores[winner]
+        bias_score = round(min(1.0, raw_score / _MAX_KEYWORDS_PER_CLASS), 2)
+        return winner, bias_score
+ 
     def _load_few_shot_examples(self) -> dict[str, list[str]]:
         try:
             import pandas as pd
-
+ 
             if not os.path.exists(_LABELS_PATH):
                 raise FileNotFoundError(_LABELS_PATH)
-
+ 
             df = pd.read_csv(_LABELS_PATH)
             df["cognitive_trigger"] = df["cognitive_trigger"].fillna("None")
-
+ 
             label_map = {
                 "Urgency":      "Urgency_Bias",
                 "Authority":    "Authority_Bias",
                 "Scarcity":     "Scarcity_Bias",
                 "Social_Proof": "Social_Proof_Bias",
             }
-
+ 
             examples: dict[str, list[str]] = {}
             for dataset_label, output_label in label_map.items():
                 subset = df[df["cognitive_trigger"] == dataset_label]["body"].dropna()
                 subset = subset[subset.str.len() > 30]
                 if len(subset) == 0:
                     continue
-                sampled = subset.sample(min(_EXAMPLES_PER_CLASS, len(subset)), random_state=42).tolist()
+                sampled = subset.sample(
+                    min(_EXAMPLES_PER_CLASS, len(subset)), random_state=42
+                ).tolist()
                 examples[output_label] = [s[:300] for s in sampled]
-
+ 
             logger.info("Few-shot examples loaded from dataset | classes: %s", list(examples.keys()))
             return examples
-
+ 
         except FileNotFoundError:
-            logger.warning("nlp_cognitive_labels.csv not found at %s — using hardcoded examples.", _LABELS_PATH)
+            logger.warning("nlp_cognitive_labels.csv not found — using hardcoded examples.")
             return self._hardcoded_examples()
         except Exception as exc:
-            logger.warning("Failed to load few-shot examples from CSV: %s — using hardcoded fallback.", exc)
+            logger.warning("Failed to load few-shot examples: %s — using hardcoded fallback.", exc)
             return self._hardcoded_examples()
-
+ 
     def _hardcoded_examples(self) -> dict[str, list[str]]:
         return {
             "Urgency_Bias": [
@@ -237,7 +290,7 @@ class CognitiveModel:
             ],
             "Authority_Bias": [
                 "From the IT Security Team: All employees must complete mandatory credential verification by end of week.",
-                "HR Department: Please acknowledge the updated Employee Code of Conduct by Friday or it will be noted in your file.",
+                "HR Department: Please acknowledge the updated Employee Code of Conduct by Friday.",
             ],
             "Scarcity_Bias": [
                 "Only 3 VPN license seats remain in your department. Claim yours before they are reassigned.",
@@ -245,6 +298,6 @@ class CognitiveModel:
             ],
             "Social_Proof_Bias": [
                 "Your entire team has already completed the security verification. You are the only member who has not confirmed.",
-                "94% of employees in your department have enrolled in the new benefits portal. Complete your enrollment now.",
+                "94% of employees in your department have enrolled in the new benefits portal.",
             ],
         }
