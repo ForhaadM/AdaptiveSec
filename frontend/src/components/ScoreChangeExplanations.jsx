@@ -35,9 +35,8 @@ function buildCounterfactual(entry) {
 
 function EntryIcon({ delta, type }) {
   const isPositive = delta > 0
-  const isThreat = type === 'Threat'
   let iconClass = 'sce-icon'
-  if (isThreat) iconClass += ' sce-icon--threat'
+  if (type === 'Threat') iconClass += ' sce-icon--threat'
   else if (isPositive) iconClass += ' sce-icon--positive'
   else iconClass += ' sce-icon--negative'
   return (
@@ -58,7 +57,13 @@ function EntryIcon({ delta, type }) {
 }
 
 function TypeBadge({ type }) {
-  const classMap = { Training: 'sce-type-badge--training', Alert: 'sce-type-badge--alert', Threat: 'sce-type-badge--threat', Behavior: 'sce-type-badge--behavior', Event: 'sce-type-badge--behavior' }
+  const classMap = {
+    Training: 'sce-type-badge--training',
+    Alert: 'sce-type-badge--alert',
+    Threat: 'sce-type-badge--threat',
+    Behavior: 'sce-type-badge--behavior',
+    Event: 'sce-type-badge--behavior',
+  }
   return <span className={`sce-type-badge ${classMap[type] ?? ''}`}>{type}</span>
 }
 
@@ -76,6 +81,8 @@ function formatRelativeTime(isoString) {
 function ScoreChangeEntry({ entry }) {
   const isPositive = entry.delta > 0
   const deltaLabel = isPositive ? `+${entry.delta}` : `−${Math.abs(entry.delta)}`
+  const [expanded, setExpanded] = useState(false)
+
   return (
     <div className="sce-entry-card">
       <div className="sce-entry">
@@ -89,7 +96,38 @@ function ScoreChangeEntry({ entry }) {
             <TypeBadge type={entry.type} />
           </div>
           <p className="sce-event-title">{entry.title}</p>
-          <p className="sce-counterfactual">{entry.counterfactual}</p>
+
+          {/* Gemini/Ollama explanation — shown if available, fallback to counterfactual */}
+          {entry.geminiExplanation ? (
+            <div style={{ marginTop: 6 }}>
+              <p style={{
+                fontSize: '0.78rem',
+                color: 'var(--text-muted)',
+                lineHeight: 1.55,
+                display: expanded ? 'block' : '-webkit-box',
+                WebkitLineClamp: expanded ? undefined : 2,
+                WebkitBoxOrient: 'vertical',
+                overflow: expanded ? 'visible' : 'hidden',
+              }}>
+                🤖 {entry.geminiExplanation}
+              </p>
+              {entry.geminiExplanation.length > 120 && (
+                <button
+                  onClick={() => setExpanded(e => !e)}
+                  style={{
+                    background: 'none', border: 'none', padding: 0,
+                    fontSize: '0.72rem', color: 'var(--accent-cyan)',
+                    cursor: 'pointer', marginTop: 2,
+                  }}
+                >
+                  {expanded ? 'Show less' : 'Read more'}
+                </button>
+              )}
+            </div>
+          ) : (
+            <p className="sce-counterfactual">{entry.counterfactual}</p>
+          )}
+
           <div className="sce-entry-footer">
             <span className="sce-tag">{entry.cognitiveTag}</span>
             <span className="sce-timestamp">{formatRelativeTime(entry.timestamp)}</span>
@@ -113,31 +151,65 @@ export default function ScoreChangeExplanations({ userId: propUserId, token: pro
 
   async function loadHistory() {
     if (!userId) return
-    setLoading(true)
+    if (entries.length === 0) setLoading(true)
     try {
-      let url, headers
-      if (isAgentView) {
-        url = `${BACKEND}/api/v1/admin/agent-history/${userId}?range=all`
-        headers = {}
-      } else {
-        url = `${API_BASE}/api/v1/users/${userId}/risk-history?range=all`
-        headers = { Authorization: `Bearer ${token}` }
-      }
+      // Fetch score history
+      const histUrl = isAgentView
+        ? `${BACKEND}/api/v1/admin/agent-history/${userId}?range=all`
+        : `${API_BASE}/api/v1/users/${userId}/risk-history?range=all`
+      const histHeaders = isAgentView ? {} : { Authorization: `Bearer ${token}` }
+      const histRes = await fetch(histUrl, { headers: histHeaders })
+      if (!histRes.ok) throw new Error(`HTTP ${histRes.status}`)
+      const histJson = await histRes.json()
 
-      const res = await fetch(url, { headers })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const json = await res.json()
-      const points = [...(json.data_points || [])].reverse()
+      // Fetch Gemini/Ollama explanations from ClickEvent nodes
+      let explanations = []
+      try {
+        const expUrl = isAgentView
+          ? `${BACKEND}/api/v1/admin/agent-explanations/${userId}`
+          : `${API_BASE}/api/v1/users/${userId}/explanations`
+        const expHeaders = isAgentView ? {} : { Authorization: `Bearer ${token}` }
+        const expRes = await fetch(expUrl, { headers: expHeaders })
+        if (expRes.ok) {
+          const expJson = await expRes.json()
+          explanations = expJson.explanations || []
+        }
+      } catch { /* explanations optional — fallback to counterfactuals */ }
+
+      const points = [...(histJson.data_points || [])].reverse()
       const built = points
         .filter(p => p.delta !== 0)
         .map((p, i) => {
           const type = classifyType(p.reason)
           const tag = cognitiveTag(p.reason)
-          const entry = { id: i, score: p.score, delta: p.delta, reason: p.reason, timestamp: p.timestamp, type, cognitiveTag: tag }
+          const entry = {
+            id: i,
+            score: p.score,
+            delta: p.delta,
+            reason: p.reason,
+            timestamp: p.timestamp,
+            type,
+            cognitiveTag: tag,
+            geminiExplanation: null,
+          }
           entry.title = buildTitle(entry)
           entry.counterfactual = buildCounterfactual(entry)
+
+          // Match explanation by closest timestamp within 60 seconds
+          if (entry.delta > 0 && explanations.length > 0) {
+            const entryTime = new Date(entry.timestamp).getTime()
+            const closest = explanations.reduce((best, e) => {
+              const diff = Math.abs(new Date(e.timestamp).getTime() - entryTime)
+              const bestDiff = Math.abs(new Date(best.timestamp).getTime() - entryTime)
+              return diff < bestDiff ? e : best
+            })
+            const timeDiff = Math.abs(new Date(closest.timestamp).getTime() - entryTime)
+            if (timeDiff < 60000) entry.geminiExplanation = closest.explanation
+          }
+
           return entry
         })
+
       setEntries(built)
       setError(null)
     } catch {

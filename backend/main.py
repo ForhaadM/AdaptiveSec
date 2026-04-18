@@ -79,6 +79,9 @@ AGENT_CLICK_PROBS = {
     "agent_remote_001":     0.68,
 }
 
+# Deterministic agents — click probability never changes regardless of training
+DETERMINISTIC_AGENTS = {'agent_cautious_001', 'agent_secure_001', 'agent_vulnerable_001'}
+
 AGENT_SIMULATIONS = [
     {"simulation_id": "SIM-001", "trigger_type": "urgency",
      "template": "Your password expires in 24 hours. Click here to reset immediately.",
@@ -111,6 +114,22 @@ async def get_user_profile_public(user_id: str):
     """Cognitive vulnerability profile — no auth."""
     profile = read_user_profile(user_id)
     return {"user_id": user_id, "triggers": profile}
+
+@app.get("/api/v1/admin/agent-explanations/{user_id}")
+async def get_agent_explanations(user_id: str):
+    """Return Gemini explanations from ClickEvent nodes — no auth."""
+    from neo4j_client import driver
+    with driver.session() as session:
+        result = session.run("""
+            MATCH (u:User {user_id: $uid})-[:HAS_EVENT]->(e:ClickEvent)
+            WHERE e.explanation IS NOT NULL
+            RETURN e.event_id AS event_id, e.explanation AS explanation,
+                   e.cognitive_trigger AS trigger,
+                   toString(e.created_at) AS timestamp
+            ORDER BY e.created_at DESC LIMIT 20
+        """, uid=user_id)
+        records = result.data()
+    return {"user_id": user_id, "explanations": records}
 
 
 @app.get("/api/v1/admin/agent-history/{user_id}")
@@ -175,12 +194,27 @@ async def get_training_module_public(module_id: str):
 @app.post("/api/v1/admin/run-simulation/{user_id}")
 async def run_agent_simulation(user_id: str):
     sim = random.choice(AGENT_SIMULATIONS)
-    base_prob = AGENT_CLICK_PROBS.get(user_id, 0.6)
+
+    # Adaptive click probability — only for non-deterministic agents
+    # Each completed training module reduces click probability by 8% (min 0.05)
+    try:
+        if user_id not in DETERMINISTIC_AGENTS:
+            completed = [m for m in get_user_training(user_id) if m.get('completed')]
+            training_reduction = len(completed) * 0.08
+            base_prob = max(0.05, AGENT_CLICK_PROBS.get(user_id, 0.6) - training_reduction)
+            if len(completed) > 0:
+                print(f"[Adaptive] {user_id} completed {len(completed)} modules, base_prob reduced to {base_prob:.2f}")
+        else:
+            base_prob = AGENT_CLICK_PROBS.get(user_id, 0.6)
+    except Exception:
+        base_prob = AGENT_CLICK_PROBS.get(user_id, 0.6)
+
     noise = random.gauss(0, 0.05)
     click_prob = max(0.0, min(1.0, base_prob + noise))
     clicked = random.random() < click_prob
 
     if not clicked:
+        # Apply small risk decay for not clicking
         current = get_risk_score(user_id)
         if current > 0:
             new_score = max(0.0, current - 2.0)
@@ -218,10 +252,11 @@ async def reset_all_agents():
         r.delete(*keys)
     return {"status": "cleared"}
 
+
 @app.post("/api/v1/admin/agent-training/{user_id}/{module_id}/complete")
 async def complete_agent_training(user_id: str, module_id: str):
     """Mark training complete for agent — no auth."""
-    from neo4j_client import driver, persist_risk_score, create_score_history
+    from neo4j_client import driver
 
     TRAINING_SCORE_REDUCTION = 5.0
 

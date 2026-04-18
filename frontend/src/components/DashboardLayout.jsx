@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useAuth } from '../AuthContext'
 import RiskScoreWidget from './RiskScoreWidget'
 import HistoryChart from './HistoryChart'
@@ -16,12 +16,55 @@ const AGENT_IDS = [
   'agent_secure_001', 'agent_vulnerable_001', 'agent_remote_001',
 ]
 
+const AGENT_GROUPS = {
+  'Urgency': ['agent_rushed_001', 'agent_deadline_001', 'agent_manager_001'],
+  'Authority': ['agent_rule_001', 'agent_compliance_001', 'agent_newhire_001'],
+  'Social Proof': ['agent_social_001', 'agent_teamplayer_001', 'agent_fomo_001'],
+  'Scarcity': ['agent_bargain_001', 'agent_hoarder_001'],
+  'Cautious': ['agent_cautious_001', 'agent_secure_001'],
+  'Vulnerable': ['agent_vulnerable_001', 'agent_remote_001'],
+}
+
 const TRIGGER_COLORS = {
   urgency: '#ef4444', authority: '#3b82f6',
   scarcity: '#f59e0b', social_proof: '#a855f7',
 }
 const TRIGGER_ICONS = {
   urgency: '⏰', authority: '🏛️', scarcity: '💎', social_proof: '👥',
+}
+
+function ThemeToggle({ theme, onToggle }) {
+  const isLight = theme === 'light'
+  return (
+    <div
+      onClick={onToggle}
+      title={isLight ? 'Switch to dark mode' : 'Switch to light mode'}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer',
+        userSelect: 'none',
+      }}
+    >
+      <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>
+        {isLight ? '☀️' : '🌙'}
+      </span>
+      <div style={{
+        width: 40, height: 22, borderRadius: 11,
+        background: isLight ? '#06B6D4' : '#334155',
+        position: 'relative', transition: 'background 0.3s',
+        border: '1px solid rgba(255,255,255,0.1)',
+        flexShrink: 0,
+      }}>
+        <div style={{
+          position: 'absolute',
+          top: 2, left: isLight ? 20 : 2,
+          width: 16, height: 16, borderRadius: '50%',
+          background: '#fff',
+          transition: 'left 0.3s cubic-bezier(0.4,0,0.2,1)',
+          boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
+        }} />
+      </div>
+    </div>
+  )
 }
 
 function FakeBrowser({ sim, phase, agentName }) {
@@ -116,8 +159,20 @@ export default function DashboardLayout({ userId: propUserId, agentName }) {
   const displayName = agentName || user?.name || 'User'
   const isAgentView = !!propUserId
   const isAgentUser = AGENT_IDS.includes(user?.user_id)
-  const showSimControls = isAgentUser || isAgentView
-  const activeUserId = userId
+  const isLocalhost = window.location.hostname === 'localhost' || !!chrome?.runtime?.id
+  const showSimControls = isAgentUser || isAgentView || isLocalhost
+
+  // Theme — persisted to localStorage
+  const [theme, setTheme] = useState(() => localStorage.getItem('adaptivesec-theme') || 'dark')
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme)
+    localStorage.setItem('adaptivesec-theme', theme)
+  }, [theme])
+
+  // Active agent switcher
+  const [activeAgentId, setActiveAgentId] = useState(userId)
+  const [showAgentDropdown, setShowAgentDropdown] = useState(false)
+  const dropdownRef = useRef(null)
 
   const [running, setRunning] = useState(false)
   const [resetting, setResetting] = useState(false)
@@ -127,33 +182,42 @@ export default function DashboardLayout({ userId: propUserId, agentName }) {
   const [simHistory, setSimHistory] = useState([])
   const [showBrowser, setShowBrowser] = useState(false)
 
+  useEffect(() => {
+    function handleClick(e) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setShowAgentDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
   async function runSimulation() {
+    console.log('running sim for:', activeAgentId)
     if (running) return
     setRunning(true)
     setShowBrowser(true)
     setBrowserPhase('idle')
-
+    setShowAgentDropdown(false)
     try {
-      const resp = await fetch(`${BACKEND}/api/v1/admin/run-simulation/${activeUserId}`, { method: 'POST' })
+      const resp = await fetch(`${BACKEND}/api/v1/admin/run-simulation/${activeAgentId}`, { method: 'POST' })
       const data = await resp.json()
       setCurrentSim(data.simulation)
-
       await new Promise(r => setTimeout(r, 500))
       setBrowserPhase('cursor-moving')
       await new Promise(r => setTimeout(r, 800))
       setBrowserPhase('cursor-on-link')
       await new Promise(r => setTimeout(r, 600))
-
       if (data.clicked) {
         setBrowserPhase('clicked')
         await new Promise(r => setTimeout(r, 5000))
-        setSimHistory(prev => [{ id: Date.now(), clicked: true, trigger: data.simulation?.trigger_type, prob: data.click_prob, timestamp: new Date().toLocaleTimeString() }, ...prev.slice(0, 7)])
+        setSimHistory(prev => [{ id: Date.now(), clicked: true, trigger: data.simulation?.trigger_type, agent: activeAgentId, timestamp: new Date().toLocaleTimeString() }, ...prev.slice(0, 7)])
       } else {
         setBrowserPhase('skipped')
-        setSimHistory(prev => [{ id: Date.now(), clicked: false, trigger: data.simulation?.trigger_type, prob: data.click_prob, timestamp: new Date().toLocaleTimeString() }, ...prev.slice(0, 7)])
+        setSimHistory(prev => [{ id: Date.now(), clicked: false, trigger: data.simulation?.trigger_type, agent: activeAgentId, timestamp: new Date().toLocaleTimeString() }, ...prev.slice(0, 7)])
       }
       setRefreshKey(k => k + 1)
-    } catch (e) {
+    } catch {
       setBrowserPhase('empty')
     }
     setRunning(false)
@@ -168,9 +232,11 @@ export default function DashboardLayout({ userId: propUserId, agentName }) {
       setBrowserPhase('empty')
       setCurrentSim(null)
       setRefreshKey(k => k + 1)
-    } catch (e) { }
+    } catch { }
     setResetting(false)
   }
+
+  const activeAgentShort = activeAgentId.replace('agent_', '').replace('_001', '')
 
   return (
     <div className="dashboard-layout">
@@ -179,14 +245,21 @@ export default function DashboardLayout({ userId: propUserId, agentName }) {
 
           {/* Top bar */}
           <div className="dashboard-topbar">
+            {/* Left — welcome */}
             <span style={{
               fontSize: '1.5rem', fontWeight: '600', letterSpacing: '-0.01em',
               background: 'linear-gradient(90deg, #a0aec0, #cbd5e0, var(--accent-blue) 80%, var(--accent-purple))',
-              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent'
+              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
             }}>
               {isAgentView ? `Agent: ${displayName}` : `Welcome, ${displayName}`}
             </span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+
+            {/* Right — all controls */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginLeft: 'auto' }}>
+
+              {/* Theme toggle slider */}
+              <ThemeToggle theme={theme} onToggle={() => setTheme(t => t === 'dark' ? 'light' : 'dark')} />
+
               {showSimControls && (
                 <>
                   <button onClick={resetAgent} disabled={resetting} style={{
@@ -197,17 +270,78 @@ export default function DashboardLayout({ userId: propUserId, agentName }) {
                   }}>
                     {resetting ? 'RESETTING...' : '↺ RESET'}
                   </button>
-                  <button onClick={runSimulation} disabled={running} style={{
-                    padding: '6px 16px',
-                    background: running ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg, #ef4444cc, #ef444488)',
-                    border: '1px solid rgba(239,68,68,0.4)', borderRadius: 6,
-                    color: running ? '#475569' : '#fff', fontSize: 11, fontWeight: 700,
-                    cursor: running ? 'not-allowed' : 'pointer', fontFamily: 'monospace',
-                  }}>
-                    {running ? '⟳ PROCESSING...' : '▶ RUN SIMULATION'}
-                  </button>
+
+                  {/* Run Simulation + agent switcher */}
+                  <div ref={dropdownRef} style={{ position: 'relative' }}>
+                    <div style={{ display: 'flex', borderRadius: 6, overflow: 'hidden', border: '1px solid rgba(239,68,68,0.4)' }}>
+                      <button
+                        onClick={runSimulation}
+                        disabled={running}
+                        style={{
+                          padding: '6px 14px',
+                          background: running ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg, #ef4444cc, #ef444488)',
+                          border: 'none',
+                          color: running ? '#475569' : '#fff', fontSize: 11, fontWeight: 700,
+                          cursor: running ? 'not-allowed' : 'pointer', fontFamily: 'monospace',
+                        }}
+                      >
+                        {running ? '⟳ PROCESSING...' : `▶ RUN — ${activeAgentShort.toUpperCase()}`}
+                      </button>
+                      <button
+                        onClick={() => !running && setShowAgentDropdown(v => !v)}
+                        disabled={running}
+                        style={{
+                          padding: '6px 8px',
+                          background: running ? 'rgba(255,255,255,0.02)' : 'rgba(239,68,68,0.3)',
+                          border: 'none', borderLeft: '1px solid rgba(239,68,68,0.3)',
+                          color: running ? '#475569' : '#fff', fontSize: 10,
+                          cursor: running ? 'not-allowed' : 'pointer',
+                        }}
+                      >
+                        {showAgentDropdown ? '▲' : '▼'}
+                      </button>
+                    </div>
+
+                    {showAgentDropdown && (
+                      <div style={{
+                        position: 'absolute', top: 'calc(100% + 6px)', right: 0,
+                        background: 'var(--bg-panel)', border: '1px solid var(--border-card)',
+                        borderRadius: 8, minWidth: 220, zIndex: 100,
+                        boxShadow: '0 8px 32px rgba(0,0,0,0.3)', overflow: 'hidden',
+                      }}>
+                        <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-light)', fontSize: 9, color: 'var(--text-muted)', fontFamily: 'monospace', letterSpacing: '0.1em' }}>
+                          SELECT AGENT TO SIMULATE
+                        </div>
+                        {Object.entries(AGENT_GROUPS).map(([group, agents]) => (
+                          <div key={group}>
+                            <div style={{ padding: '4px 12px', fontSize: 9, color: 'var(--text-mono)', fontFamily: 'monospace', letterSpacing: '0.08em', background: 'var(--bg-dark)' }}>
+                              {group.toUpperCase()}
+                            </div>
+                            {agents.map(agentId => (
+                              <div
+                                key={agentId}
+                                onClick={() => { setActiveAgentId(agentId); setShowAgentDropdown(false); setRefreshKey(k => k + 1) }}
+                                style={{
+                                  padding: '7px 12px', cursor: 'pointer',
+                                  fontSize: 11, fontFamily: 'monospace',
+                                  color: agentId === activeAgentId ? 'var(--accent-cyan)' : 'var(--text-muted)',
+                                  background: agentId === activeAgentId ? 'rgba(6,182,212,0.08)' : 'transparent',
+                                  display: 'flex', alignItems: 'center', gap: 8,
+                                  borderLeft: agentId === activeAgentId ? '2px solid var(--accent-cyan)' : '2px solid transparent',
+                                }}
+                              >
+                                {agentId === activeAgentId && <span style={{ fontSize: 8 }}>●</span>}
+                                {agentId.replace('agent_', '').replace('_001', '')}
+                              </div>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </>
               )}
+
               {!isAgentView && (
                 <button className="logout-btn" onClick={logout}>Sign out</button>
               )}
@@ -223,28 +357,20 @@ export default function DashboardLayout({ userId: propUserId, agentName }) {
             </p>
           </div>
 
-          {/* Main body — grid + optional sim panel side by side */}
           <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
-
-            {/* Dashboard grid */}
             <div style={{ flex: 1, minWidth: 0 }}>
               <div className="grid-layout">
-                <RiskScoreWidget userId={activeUserId} token={token} refreshKey={refreshKey} />
-                <CognitiveProfileCard userId={activeUserId} token={token} refreshKey={refreshKey} />
-                <ScoreChangeExplanations userId={activeUserId} token={token} refreshKey={refreshKey} />
-                <TrainingProgressSection userId={activeUserId} token={token} refreshKey={refreshKey} onComplete={() => setRefreshKey(k => k + 1)} />
-                <HistoryChart userId={activeUserId} token={token} refreshKey={refreshKey} />
+                <RiskScoreWidget userId={activeAgentId} token={token} refreshKey={refreshKey} />
+                <CognitiveProfileCard userId={activeAgentId} token={token} refreshKey={refreshKey} />
+                <ScoreChangeExplanations userId={activeAgentId} token={token} refreshKey={refreshKey} />
+                <TrainingProgressSection userId={activeAgentId} token={token} refreshKey={refreshKey} onComplete={() => setRefreshKey(k => k + 1)} />
+                <HistoryChart userId={activeAgentId} token={token} refreshKey={refreshKey} />
               </div>
             </div>
 
-            {/* Sim panel — right column, only visible after first simulation */}
             {showSimControls && showBrowser && (
-              <div style={{
-                width: 340, flexShrink: 0,
-                position: 'sticky', top: 20,
-              }}>
-                {/* Phishing browser */}
-                <div style={{ fontSize: 10, color: '#475569', letterSpacing: '0.1em', fontFamily: 'monospace', marginBottom: 8 }}>
+              <div style={{ width: 340, flexShrink: 0, position: 'sticky', top: 20 }}>
+                <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: '0.1em', fontFamily: 'monospace', marginBottom: 8 }}>
                   SIMULATED PHISHING ATTEMPT
                 </div>
                 {browserPhase === 'idle' ? (
@@ -253,30 +379,27 @@ export default function DashboardLayout({ userId: propUserId, agentName }) {
                   </div>
                 ) : (
                   <div style={{ marginBottom: 16 }}>
-                    <FakeBrowser sim={currentSim} phase={browserPhase} agentName={displayName} />
+                    <FakeBrowser sim={currentSim} phase={browserPhase} agentName={activeAgentShort} />
                   </div>
                 )}
-
-                {/* Recent simulations */}
-                <div style={{ fontSize: 10, color: '#475569', letterSpacing: '0.1em', fontFamily: 'monospace', marginBottom: 8 }}>
+                <div style={{ fontSize: 10, color: 'var(--text-muted)', letterSpacing: '0.1em', fontFamily: 'monospace', marginBottom: 8 }}>
                   RECENT SIMULATIONS
                 </div>
-                <div style={{ background: '#0d1625', borderRadius: 10, border: '1px solid #1a2540', padding: '10px 12px' }}>
+                <div style={{ background: 'var(--bg-panel)', borderRadius: 10, border: '1px solid var(--border-card)', padding: '10px 12px' }}>
                   {simHistory.length === 0 ? (
-                    <div style={{ fontSize: 11, color: '#1e293b', fontFamily: 'monospace' }}>No history yet</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-mono)', fontFamily: 'monospace' }}>No history yet</div>
                   ) : simHistory.map(h => (
-                    <div key={h.id} style={{
-                      display: 'flex', alignItems: 'center', gap: 6,
-                      padding: '5px 0', borderBottom: '1px solid #1a2540',
-                    }}>
+                    <div key={h.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 0', borderBottom: '1px solid var(--border-light)' }}>
                       <span style={{ fontSize: 12 }}>{h.clicked ? '✗' : '✓'}</span>
-                      <span style={{ fontSize: 10, color: TRIGGER_COLORS[h.trigger] || '#64748b', fontFamily: 'monospace', flex: 1 }}>
+                      <span style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'monospace', flex: 1 }}>
+                        {h.agent?.replace('agent_', '').replace('_001', '')}
+                      </span>
+                      <span style={{ fontSize: 10, color: TRIGGER_COLORS[h.trigger] || '#64748b', fontFamily: 'monospace' }}>
                         {h.trigger?.toUpperCase().replace('_', ' ')}
                       </span>
-                      <span style={{ fontSize: 10, color: h.clicked ? '#ef4444' : '#22c55e', fontFamily: 'monospace' }}>
+                      <span style={{ fontSize: 10, color: h.clicked ? '#ef4444' : '#22c55e', fontFamily: 'monospace', marginLeft: 4 }}>
                         {h.clicked ? 'CLICKED' : 'SKIPPED'}
                       </span>
-                      <span style={{ fontSize: 9, color: '#334155', marginLeft: 4 }}>{h.timestamp}</span>
                     </div>
                   ))}
                 </div>
