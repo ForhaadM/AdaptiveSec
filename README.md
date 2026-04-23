@@ -256,6 +256,23 @@ USE_OLLAMA=false
 | `JWT_SECRET` | Any random string — generate one: `python -c "import secrets; print(secrets.token_hex(32))"` |
 | `USE_OLLAMA` | Set to `true` if you install [Ollama](https://ollama.com) locally with `ollama pull llama3.2:3b` |
 
+### LLM Fallback Chain
+
+AdaptiveSec uses a three-tier fallback for AI-generated explanations and cognitive bias classification:
+
+1. **Google Gemini 2.5 Flash** — primary, requires `GEMINI_API_KEY`
+2. **Ollama Llama 3.2 3B** — local fallback, requires Ollama installed and `USE_OLLAMA=true`
+3. **Keyword classifier / template** — always available, no setup needed
+
+If you don't have a Gemini API key, set `USE_OLLAMA=true` and install Ollama:
+
+```bash
+# Install from https://ollama.com then:
+ollama pull llama3.2:3b
+```
+
+The system will automatically use Ollama for both trigger classification and explanation generation. If Ollama is also unavailable, it falls back to keyword matching and hardcoded explanation templates — so the system always works regardless of API availability.
+
 To use Ollama as a local LLM fallback:
 
 ```bash
