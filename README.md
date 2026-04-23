@@ -317,12 +317,12 @@ When a click event enters the RabbitMQ queue, it is processed sequentially:
 
 | Name | Role | Dept |
 | --- | --- | --- |
-| Forhaad Miah | Backend, ML Pipeline, Neo4j | CS |
-| Hamza Siddiqui | IT Security, Infrastructure | IT |
-| Niko Fushi | ML, CognitiveModel | CS |
-| Adnan Vaktapuriya | Frontend, Chrome Extension | CS |
-| Aiden Lee | Frontend, Dashboard | CS |
+| Forhaad Miah | Developer | CS |
+| Hamza Siddiqui | Developer | IT |
+| Niko Fushi | Developer | CS |
+| Adnan Vaktapuriya | Developer | CS |
+| Aiden Lee | Developer | CS |
 
 ---
 
-*AdaptiveSec — CSI 4999 Capstone — University of Michigan-Dearborn — Spring 2026*
+*AdaptiveSec — CSI 4999 Capstone — Oakland University — Winter 2026*
