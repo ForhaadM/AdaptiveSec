@@ -93,6 +93,8 @@ def process_event(body):
         )
         r = redis.from_url(os.getenv("REDIS_URL", "redis://localhost:6379"))
         r.setex(f"risk_score:{user_id}", 60, str(new_score))
+        r.delete(f"dashboard:{user_id}")
+        r.delete(f"profile:{user_id}")
         print(f"[Worker] Score persisted and cached for {user_id}: {new_score}")
     except Exception as e:
         logger.warning(f"[Worker] Score persist failed: {e}")

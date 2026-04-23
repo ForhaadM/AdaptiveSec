@@ -117,6 +117,22 @@ async def get_all_agent_scores():
         scores[uid] = get_risk_score(uid)
     return {"agents": scores}
 
+@app.get("/api/v1/users/{user_id}/explanations")
+async def get_user_explanations(user_id: str, _: str = Depends(get_current_user)):
+    """Return Gemini explanations for real users — requires auth."""
+    from neo4j_client import driver
+    with driver.session() as session:
+        result = session.run("""
+            MATCH (u:User {user_id: $uid})-[:HAS_EVENT]->(e:ClickEvent)
+            WHERE e.explanation IS NOT NULL
+            RETURN e.event_id AS event_id, e.explanation AS explanation,
+                   e.cognitive_trigger AS trigger,
+                   toString(e.created_at) AS timestamp
+            ORDER BY e.created_at DESC LIMIT 20
+        """, uid=user_id)
+        records = result.data()
+    return {"user_id": user_id, "explanations": records}
+
 
 @app.get("/api/v1/users/{user_id}/profile-public")
 async def get_user_profile_public(user_id: str):
@@ -260,6 +276,36 @@ async def reset_all_agents():
     if keys:
         r.delete(*keys)
     return {"status": "cleared"}
+
+@app.post("/api/v1/admin/reset-user/{user_id}")
+async def reset_user_score(user_id: str):
+    """Reset a specific user's score — no auth, for demo purposes."""
+    from neo4j_client import driver
+    with driver.session() as session:
+        session.run("""
+            MATCH (u:User {user_id: $uid})
+            SET u.risk_score = 0
+            WITH u
+            OPTIONAL MATCH (u)-[:HAS_SCORE_HISTORY]->(h:ScoreHistory)
+            DETACH DELETE h
+        """, uid=user_id)
+        session.run("""
+            MATCH (u:User {user_id: $uid})-[r:VULNERABLE_TO]->()
+            DELETE r
+        """, uid=user_id)
+        session.run("""
+            MATCH (u:User {user_id: $uid})-[r:ASSIGNED_TRAINING]->()
+            DELETE r
+        """, uid=user_id)
+        session.run("""
+            MATCH (u:User {user_id: $uid})-[:HAS_EVENT]->(e:ClickEvent)
+            DETACH DELETE e
+        """, uid=user_id)
+    r = sync_redis.from_url(os.getenv("REDIS_URL", "redis://localhost:6379"))
+    r.delete(f"risk_score:{user_id}")
+    r.delete(f"dashboard:{user_id}")
+    r.delete(f"profile:{user_id}")
+    return {"status": "reset", "user_id": user_id}
 
 
 @app.post("/api/v1/admin/agent-training/{user_id}/{module_id}/complete")

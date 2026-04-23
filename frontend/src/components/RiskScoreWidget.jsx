@@ -122,12 +122,7 @@ export default function RiskScoreWidget({ userId: propUserId, token: propToken, 
     }
   }, [userId])
 
-  useEffect(() => {
-    if (refreshKey > 0) {
-      loadScore()
-      setTimeout(() => loadScore(), 3500)
-    }
-  }, [refreshKey])
+  useEffect(() => { if (refreshKey > 0) loadScore() }, [refreshKey])
 
   function formatLastUpdated(date) {
     if (!date) return ''
@@ -141,20 +136,20 @@ export default function RiskScoreWidget({ userId: propUserId, token: propToken, 
   const flashBorder = flashColor === 'red'
     ? 'rgba(239,68,68,0.6)'
     : flashColor === 'green'
-    ? 'rgba(34,197,94,0.6)'
-    : 'transparent'
+      ? 'rgba(34,197,94,0.6)'
+      : 'transparent'
 
   const flashBg = flashColor === 'red'
     ? 'rgba(239,68,68,0.05)'
     : flashColor === 'green'
-    ? 'rgba(34,197,94,0.05)'
-    : 'transparent'
+      ? 'rgba(34,197,94,0.05)'
+      : 'transparent'
 
   const flashScoreColor = flashColor === 'red'
     ? '#ef4444'
     : flashColor === 'green'
-    ? '#22c55e'
-    : undefined
+      ? '#22c55e'
+      : undefined
 
   if (loading) return (
     <div className="card risk-widget">

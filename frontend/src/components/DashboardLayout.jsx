@@ -39,10 +39,7 @@ function ThemeToggle({ theme, onToggle }) {
     <div
       onClick={onToggle}
       title={isLight ? 'Switch to dark mode' : 'Switch to light mode'}
-      style={{
-        display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer',
-        userSelect: 'none',
-      }}
+      style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', userSelect: 'none' }}
     >
       <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>
         {isLight ? '☀️' : '🌙'}
@@ -51,8 +48,7 @@ function ThemeToggle({ theme, onToggle }) {
         width: 40, height: 22, borderRadius: 11,
         background: isLight ? '#06B6D4' : '#334155',
         position: 'relative', transition: 'background 0.3s',
-        border: '1px solid rgba(255,255,255,0.1)',
-        flexShrink: 0,
+        border: '1px solid rgba(255,255,255,0.1)', flexShrink: 0,
       }}>
         <div style={{
           position: 'absolute',
@@ -159,17 +155,15 @@ export default function DashboardLayout({ userId: propUserId, agentName }) {
   const displayName = agentName || user?.name || 'User'
   const isAgentView = !!propUserId
   const isAgentUser = AGENT_IDS.includes(user?.user_id)
-  const isLocalhost = window.location.hostname === 'localhost' || !!chrome?.runtime?.id
+  const isLocalhost = window.location.hostname === 'localhost' || !!(typeof chrome !== 'undefined' && chrome?.runtime?.id)
   const showSimControls = isAgentUser || isAgentView || isLocalhost
 
-  // Theme — persisted to localStorage
   const [theme, setTheme] = useState(() => localStorage.getItem('adaptivesec-theme') || 'dark')
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
     localStorage.setItem('adaptivesec-theme', theme)
   }, [theme])
 
-  // Active agent switcher
   const [activeAgentId, setActiveAgentId] = useState(userId)
   const [showAgentDropdown, setShowAgentDropdown] = useState(false)
   const dropdownRef = useRef(null)
@@ -181,6 +175,7 @@ export default function DashboardLayout({ userId: propUserId, agentName }) {
   const [refreshKey, setRefreshKey] = useState(0)
   const [simHistory, setSimHistory] = useState([])
   const [showBrowser, setShowBrowser] = useState(false)
+  const [aiRefreshKey, setAiRefreshKey] = useState(0)
 
   useEffect(() => {
     function handleClick(e) {
@@ -193,7 +188,6 @@ export default function DashboardLayout({ userId: propUserId, agentName }) {
   }, [])
 
   async function runSimulation() {
-    console.log('running sim for:', activeAgentId)
     if (running) return
     setRunning(true)
     setShowBrowser(true)
@@ -217,6 +211,10 @@ export default function DashboardLayout({ userId: propUserId, agentName }) {
         setSimHistory(prev => [{ id: Date.now(), clicked: false, trigger: data.simulation?.trigger_type, agent: activeAgentId, timestamp: new Date().toLocaleTimeString() }, ...prev.slice(0, 7)])
       }
       setRefreshKey(k => k + 1)
+      setTimeout(() => setAiRefreshKey(k => k + 1), 4000)
+      if (typeof chrome !== 'undefined' && chrome?.storage) {
+        chrome.storage.local.set({ last_sim_timestamp: Date.now() })
+      }
     } catch {
       setBrowserPhase('empty')
     }
@@ -227,11 +225,22 @@ export default function DashboardLayout({ userId: propUserId, agentName }) {
     if (!confirm('Reset all agent data? This clears all scores and training.')) return
     setResetting(true)
     try {
-      await fetch(`${BACKEND}/api/v1/admin/reset-agents`, { method: 'POST' })
+      if (isAgentUser || isAgentView) {
+        await fetch(`${BACKEND}/api/v1/admin/reset-agents`, { method: 'POST' })
+      } else {
+        await fetch(`${BACKEND}/api/v1/admin/reset-user/${activeAgentId}`, { method: 'POST' })
+      }
       setSimHistory([])
       setBrowserPhase('empty')
       setCurrentSim(null)
+      await new Promise(r => setTimeout(r, 500))
       setRefreshKey(k => k + 1)
+      if (!isAgentUser && !isAgentView) {
+        setTimeout(() => window.location.reload(), 800)
+      }
+      if (typeof chrome !== 'undefined' && chrome?.storage) {
+        chrome.storage.local.set({ last_sim_timestamp: Date.now() })
+      }
     } catch { }
     setResetting(false)
   }
@@ -243,9 +252,7 @@ export default function DashboardLayout({ userId: propUserId, agentName }) {
       <main className="main-wrapper">
         <section className="main-content">
 
-          {/* Top bar */}
           <div className="dashboard-topbar">
-            {/* Left — welcome */}
             <span style={{
               fontSize: '1.5rem', fontWeight: '600', letterSpacing: '-0.01em',
               background: 'linear-gradient(90deg, #a0aec0, #cbd5e0, var(--accent-blue) 80%, var(--accent-purple))',
@@ -254,10 +261,7 @@ export default function DashboardLayout({ userId: propUserId, agentName }) {
               {isAgentView ? `Agent: ${displayName}` : `Welcome, ${displayName}`}
             </span>
 
-            {/* Right — all controls */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginLeft: 'auto' }}>
-
-              {/* Theme toggle slider */}
               <ThemeToggle theme={theme} onToggle={() => setTheme(t => t === 'dark' ? 'light' : 'dark')} />
 
               {showSimControls && (
@@ -271,7 +275,6 @@ export default function DashboardLayout({ userId: propUserId, agentName }) {
                     {resetting ? 'RESETTING...' : '↺ RESET'}
                   </button>
 
-                  {/* Run Simulation + agent switcher */}
                   <div ref={dropdownRef} style={{ position: 'relative' }}>
                     <div style={{ display: 'flex', borderRadius: 6, overflow: 'hidden', border: '1px solid rgba(239,68,68,0.4)' }}>
                       <button
@@ -360,11 +363,32 @@ export default function DashboardLayout({ userId: propUserId, agentName }) {
           <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div className="grid-layout">
-                <RiskScoreWidget userId={activeAgentId} token={token} refreshKey={refreshKey} />
-                <CognitiveProfileCard userId={activeAgentId} token={token} refreshKey={refreshKey} />
-                <ScoreChangeExplanations userId={activeAgentId} token={token} refreshKey={refreshKey} />
-                <TrainingProgressSection userId={activeAgentId} token={token} refreshKey={refreshKey} onComplete={() => setRefreshKey(k => k + 1)} />
-                <HistoryChart userId={activeAgentId} token={token} refreshKey={refreshKey} />
+                <RiskScoreWidget
+                  userId={isAgentUser || isAgentView ? activeAgentId : undefined}
+                  token={token}
+                  refreshKey={refreshKey}
+                />
+                <CognitiveProfileCard
+                  userId={isAgentUser || isAgentView ? activeAgentId : undefined}
+                  token={token}
+                  refreshKey={refreshKey}
+                />
+                <ScoreChangeExplanations
+                  userId={isAgentUser || isAgentView ? activeAgentId : undefined}
+                  token={token}
+                  refreshKey={refreshKey + aiRefreshKey}
+                />
+                <TrainingProgressSection
+                  userId={isAgentUser || isAgentView ? activeAgentId : undefined}
+                  token={token}
+                  refreshKey={refreshKey}
+                  onComplete={() => setRefreshKey(k => k + 1)}
+                />
+                <HistoryChart
+                  userId={isAgentUser || isAgentView ? activeAgentId : undefined}
+                  token={token}
+                  refreshKey={refreshKey}
+                />
               </div>
             </div>
 

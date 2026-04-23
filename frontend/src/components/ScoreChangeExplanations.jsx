@@ -98,7 +98,15 @@ function ScoreChangeEntry({ entry }) {
           <p className="sce-event-title">{entry.title}</p>
 
           {/* Gemini/Ollama explanation — shown if available, fallback to counterfactual */}
-          {entry.geminiExplanation ? (
+
+          {entry.delta > 0 && !entry.geminiExplanation ? (
+            <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div className="loading-spinner" style={{ width: 12, height: 12, borderWidth: 2 }} />
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+                Generating AI explanation...
+              </span>
+            </div>
+          ) : entry.geminiExplanation ? (
             <div style={{ marginTop: 6 }}>
               <p style={{
                 fontSize: '0.78rem',
@@ -124,9 +132,9 @@ function ScoreChangeEntry({ entry }) {
                 </button>
               )}
             </div>
-          ) : (
+          ) : entry.delta < 0 ? (
             <p className="sce-counterfactual">{entry.counterfactual}</p>
-          )}
+          ) : null}
 
           <div className="sce-entry-footer">
             <span className="sce-tag">{entry.cognitiveTag}</span>
@@ -204,7 +212,7 @@ export default function ScoreChangeExplanations({ userId: propUserId, token: pro
               return diff < bestDiff ? e : best
             })
             const timeDiff = Math.abs(new Date(closest.timestamp).getTime() - entryTime)
-            if (timeDiff < 60000) entry.geminiExplanation = closest.explanation
+            if (timeDiff < 120000) entry.geminiExplanation = closest.explanation
           }
 
           return entry
@@ -221,7 +229,6 @@ export default function ScoreChangeExplanations({ userId: propUserId, token: pro
 
   useEffect(() => { loadHistory() }, [userId])
   useEffect(() => { if (refreshKey > 0) loadHistory() }, [refreshKey])
-
   const visible = showAll ? entries : entries.slice(0, VISIBLE_BY_DEFAULT)
 
   return (

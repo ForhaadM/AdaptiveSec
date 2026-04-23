@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../AuthContext'
 import API_BASE from '../apiBase'
 
@@ -29,43 +29,54 @@ export default function CognitiveProfileCard({ userId: propUserId, token: propTo
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
-  async function loadProfile() {
-    if (!userId) return
-    setLoading(true)
-    try {
-      if (isAgentView) {
-        const res = await fetch(`${BACKEND}/api/v1/users/${userId}/profile-public`)
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        const json = await res.json()
-        // Convert triggers array to bias_scores format
-        const bias_scores = { Urgency: 0, Authority: 0, Scarcity: 0, SocialProof: 0 }
-        const triggerMap = { 'Urgency': 'Urgency', 'Authority': 'Authority', 'Scarcity': 'Scarcity', 'Social Proof': 'SocialProof' }
-        let dominant = null, maxScore = 0
-          ; (json.triggers || []).forEach(t => {
-            const key = triggerMap[t.trigger]
-            if (key) {
-              bias_scores[key] = t.score
-              if (t.score > maxScore) { maxScore = t.score; dominant = key }
-            }
-          })
-        setData({ bias_scores, dominant_cognitive_trait: dominant })
-      } else {
-        const res = await fetch(`${API_BASE}/api/v1/users/${userId}/profile`, {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        setData(await res.json())
-      }
-      setError(null)
-    } catch {
-      setError('Failed to load vulnerability profile.')
-    } finally {
-      setLoading(false)
-    }
-  }
+  // 1. Wrap loadProfile in useCallback (Best Practice)
+  // This prevents the function from being "re-created" every render, 
+  // which avoids infinite loops.
+  const loadProfile = useCallback(async () => {
+    if (!userId) return;
 
-  useEffect(() => { loadProfile() }, [userId])
-  useEffect(() => { if (refreshKey > 0) loadProfile() }, [refreshKey])
+    setLoading(true);
+    try {
+      const url = isAgentView
+        ? `${BACKEND}/api/v1/users/${userId}/profile-public`
+        : `${API_BASE}/api/v1/users/${userId}/profile`;
+
+      const headers = isAgentView ? {} : { Authorization: `Bearer ${token}` };
+
+      const res = await fetch(url, { headers });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+
+      if (isAgentView) {
+        // Your existing mapping logic for Agent View
+        const bias_scores = { Urgency: 0, Authority: 0, Scarcity: 0, SocialProof: 0 };
+        const triggerMap = { 'Urgency': 'Urgency', 'Authority': 'Authority', 'Scarcity': 'Scarcity', 'Social Proof': 'SocialProof' };
+        let dominant = null, maxScore = 0;
+        (json.triggers || []).forEach(t => {
+          const key = triggerMap[t.trigger];
+          if (key) {
+            bias_scores[key] = t.score;
+            if (t.score > maxScore) { maxScore = t.score; dominant = key; }
+          }
+        });
+        setData({ bias_scores, dominant_cognitive_trait: dominant });
+      } else {
+        setData(json);
+      }
+      setError(null);
+    } catch (err) {
+      setError('Failed to load vulnerability profile.');
+    } finally {
+      setLoading(false);
+    }
+  }, [userId, token, isAgentView]); // Dependencies for the function itself
+
+  // 2. The single Effect
+  useEffect(() => {
+    loadProfile();
+  }, [loadProfile, refreshKey]);
+  // This triggers whenever the stable loadProfile function changes (rare) 
+  // or whenever refreshKey is incremented.
 
   if (loading) return (
     <div className="card cognitive-card">
