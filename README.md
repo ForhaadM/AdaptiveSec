@@ -4,7 +4,7 @@
 
 AdaptiveSec is a behavioral risk analysis and security awareness platform that moves beyond generic cybersecurity training. Instead of one-size-fits-all modules, it delivers controlled phishing simulations, tracks which psychological triggers each user falls for, and automatically assigns targeted training — while the context is still fresh.
 
-> **CSI 4999 Senior Capstone — University of Michigan-Dearborn — Spring 2026**
+> **CSI 4999 Senior Capstone — Oakland University — Winter 2026**
 
 ---
 
