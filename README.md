@@ -228,7 +228,11 @@ npm run build -- --emptyOutDir
 
 ## Environment Variables
 
-The `.env` file is **never committed**. Contact Forhaad to obtain it. Place it in `backend/`.
+The `.env` file is never committed. Copy `.env.example` to `.env` and fill in your own keys:
+
+```bash
+cp .env.example .env
+```
 
 ```env
 NEO4J_URI=
@@ -240,6 +244,17 @@ JWT_SECRET=
 GEMINI_API_KEY=
 USE_OLLAMA=false
 ```
+
+### Where to get your keys
+
+| Variable | How to obtain |
+| --- | --- |
+| `NEO4J_URI` / `NEO4J_USERNAME` / `NEO4J_PASSWORD` | Create a free instance at [neo4j.com/cloud/aura](https://neo4j.com/cloud/aura) |
+| `GEMINI_API_KEY` | Get a free key at [aistudio.google.com](https://aistudio.google.com) |
+| `REDIS_URL` | Run locally: `docker run -d -p 6379:6379 redis` |
+| `RABBITMQ_URL` | Run locally: `docker run -d --name rabbitmq -p 5672:5672 rabbitmq:management` |
+| `JWT_SECRET` | Any random string — generate one: `python -c "import secrets; print(secrets.token_hex(32))"` |
+| `USE_OLLAMA` | Set to `true` if you install [Ollama](https://ollama.com) locally with `ollama pull llama3.2:3b` |
 
 To use Ollama as a local LLM fallback:
 
