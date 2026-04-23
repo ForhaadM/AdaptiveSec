@@ -1,6 +1,6 @@
 const BACKEND_URL = "http://localhost:8000";
 
-// Called after Google OAuth succeeds — saves token from our backend
+// Called after Google OAuth succeeds -> saves token from our backend
 async function handleGoogleLogin() {
     return new Promise((resolve, reject) => {
         chrome.identity.getAuthToken({ interactive: true }, async (googleToken) => {
@@ -11,7 +11,7 @@ async function handleGoogleLogin() {
             }
 
             try {
-                // Send Google token to our backend to get our own JWT
+                // Send Google token to backend to get our own JWT
                 const resp = await fetch(`${BACKEND_URL}/auth/google`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -20,7 +20,7 @@ async function handleGoogleLogin() {
 
                 const data = await resp.json();
 
-                // Save our JWT, user_id, and display name to Chrome storage
+                // Save JWT, user_id, and display name to Chrome storage
                 await chrome.storage.local.set({
                     token: data.access_token,
                     user_id: data.user_id,
@@ -46,7 +46,7 @@ async function checkAuthStatus() {
     return { isLoggedIn: !!(token && user_id), token, user_id, user_name };
 }
 
-// Logout — clear all stored auth data
+// Logout: clear all stored auth data
 async function logout() {
     await chrome.storage.local.remove(["token", "user_id", "user_name", "user_email"]);
     console.log("[AdaptiveSec] Logged out");

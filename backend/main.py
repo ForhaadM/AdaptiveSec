@@ -1,9 +1,10 @@
 from contextlib import asynccontextmanager
 import asyncio
 import os
+import time
 import random
 from datetime import datetime, timezone
-from fastapi import FastAPI, Depends, WebSocket, WebSocketDisconnect, Query, status, HTTPException
+from fastapi import FastAPI, Depends, WebSocket, WebSocketDisconnect, Query, status, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from auth import router as auth_router, get_current_user, verify_token
 from websocket_manager import manager
@@ -39,6 +40,14 @@ app.include_router(dashboard_router)
 @app.get("/protected")
 async def protected_route(user_id: str = Depends(get_current_user)):
     return {"message": f"Hello {user_id}, you are authenticated"}
+
+@app.middleware("http")
+async def log_response_time(request: Request, call_next):
+    start = time.time()
+    response = await call_next(request)
+    duration = (time.time() - start) * 1000
+    print(f"[METRICS] {request.method} {request.url.path} → {response.status_code} | {duration:.1f}ms")
+    return response
 
 
 @app.websocket("/ws/v1/alerts/{user_id}")

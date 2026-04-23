@@ -130,7 +130,7 @@ class CognitiveModel:
         prompt  = self._build_prompt(text)
         payload = {
             "contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {"temperature": 0.1, "maxOutputTokens": 20},
+            "generationConfig": {"temperature": 0.1, "maxOutputTokens": 100},
         }
 
         url  = f"{_GEMINI_URL}?key={_GEMINI_API_KEY}"
