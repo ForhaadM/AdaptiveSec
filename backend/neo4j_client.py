@@ -9,7 +9,7 @@ URI = os.getenv("NEO4J_URI", "")
 USERNAME = os.getenv("NEO4J_USERNAME", "")
 PASSWORD = os.getenv("NEO4J_PASSWORD", "")
 
-driver = GraphDatabase.driver(URI, auth=(USERNAME, PASSWORD))
+driver = GraphDatabase.driver(URI, auth=(USERNAME, PASSWORD), max_connection_lifetime=200, keep_alive=True)
 
 def init_schema():
     with driver.session() as session:
