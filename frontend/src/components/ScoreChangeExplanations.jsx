@@ -29,7 +29,8 @@ function buildTitle(entry) {
 }
 
 function buildCounterfactual(entry) {
-  if (entry.delta < 0) return `Completing this training reduced your exposure by ${Math.abs(entry.delta)} points.`
+  if (entry.type === 'Training') return `Completing this training reduced your exposure by ${Math.abs(entry.delta)} points.`
+  if (entry.delta < 0) return `Risk score decreased by ${Math.abs(entry.delta)} points — threat avoided.`
   return `Recognising this trigger earlier could have limited the impact to ${Math.round(Math.abs(entry.delta) / 2)} pts.`
 }
 

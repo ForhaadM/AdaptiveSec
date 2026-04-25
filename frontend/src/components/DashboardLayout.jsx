@@ -258,7 +258,11 @@ export default function DashboardLayout({ userId: propUserId, agentName }) {
               background: 'linear-gradient(90deg, #a0aec0, #cbd5e0, var(--accent-blue) 80%, var(--accent-purple))',
               WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
             }}>
-              {isAgentView ? `Agent: ${displayName}` : `Welcome, ${displayName}`}
+              {isAgentView
+                ? `Agent: ${displayName}`
+                : `Welcome, ${AGENT_IDS.includes(activeAgentId)
+                  ? `Agent ${activeAgentId.replace('agent_', '').replace('_001', '')}`
+                  : displayName}`}
             </span>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginLeft: 'auto' }}>
