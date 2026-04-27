@@ -40,7 +40,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
     except JWTError:
         raise credentials_exception
 
-# Synthetic agent endpoint : bypasses OAuth, used for testing only
+
 @router.post("/auth/token")
 async def login(user_id: str | None = None):
     if not user_id:

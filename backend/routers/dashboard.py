@@ -78,7 +78,7 @@ def _cutoff_for_range(range_param: str) -> datetime | None:
     return None  # "all"
 
 
-# AC1 — GET /api/v1/users/{user_id}/dashboard
+
 
 @router.get("/users/{user_id}/dashboard")
 async def get_dashboard(
@@ -128,7 +128,7 @@ async def get_dashboard(
     return payload
 
 
-# AC2 — GET /api/v1/users/{user_id}/profile
+
 
 @router.get("/users/{user_id}/profile")
 async def get_profile(
@@ -181,7 +181,7 @@ async def get_profile(
     return payload
 
 
-# AC3 — GET /api/v1/users/{user_id}/risk-history?range={30d|90d|all}
+
 
 @router.get("/users/{user_id}/risk-history")
 async def get_risk_history(
@@ -239,7 +239,7 @@ async def get_risk_history(
     }
 
 
-# AC4 — GET /api/v1/users/{user_id}/training
+
 
 @router.get("/users/{user_id}/training")
 async def get_user_training(
@@ -284,7 +284,7 @@ async def get_user_training(
     return {"user_id": user_id, "modules": modules}
 
 
-# AC5 — GET /api/v1/training/{module_id}
+
 
 @router.get("/training/{module_id}")
 async def get_training_module(
@@ -315,7 +315,6 @@ async def get_training_module(
         )
 
     video_urls = record["video_urls"] or []
-    # content_url is the primary video — prefer stored content_url, fall back to first video_url
     content_url = record["content_url"] or (video_urls[0] if video_urls else None)
 
     return {
@@ -328,7 +327,7 @@ async def get_training_module(
     }
 
 
-# W4-005 — POST /api/v1/users/{user_id}/training/{module_id}/complete
+
 
 @router.post("/users/{user_id}/training/{module_id}/complete")
 async def complete_training_module(
@@ -341,7 +340,6 @@ async def complete_training_module(
     TRAINING_SCORE_REDUCTION pts, and record a ScoreHistory entry.
     """
     with neo4j_driver.session() as session:
-        # Mark the assignment edge as completed and retrieve current risk score
         result = session.run(
             """
             MATCH (u:User {user_id: $uid})-[r:ASSIGNED_TRAINING]->(m:TrainingModule {module_id: $mid})
@@ -365,7 +363,7 @@ async def complete_training_module(
     current_score = float(record["current_score"])
     new_score = max(0.0, current_score - TRAINING_SCORE_REDUCTION)
 
-    # Persist updated score and history entry (sync neo4j helpers are fine here)
+    
     persist_risk_score(user_id, new_score)
     create_score_history(
         user_id=user_id,
@@ -374,7 +372,7 @@ async def complete_training_module(
         reason=f"training_completed:{module_id}",
     )
 
-    # Invalidate cached dashboard and profile so next load reflects new score
+    
     await _redis_delete(f"dashboard:{user_id}")
     await _redis_delete(f"risk_score:{user_id}")
 
