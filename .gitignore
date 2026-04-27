@@ -1,0 +1,24 @@
+.env
+__pycache__/
+*.pyc
+node_modules/
+.DS_Store
+.vscode/
+*.log
+dist/
+build/
+.venv/
+
+# Datasets
+data/raw/
+data/gemini_prompt/
+
+Thumbs.db
+
+# Chrome extension build artifacts
+*.pem
+*.crx
+
+# IDE
+.idea/
+.pytest_cache/
