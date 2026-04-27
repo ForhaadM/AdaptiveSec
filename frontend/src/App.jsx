@@ -20,7 +20,6 @@ function AppContent() {
 }
 
 function App() {
-  // AgentSimRunner runs outside AuthProvider — no auth needed
   if (isSimMode) return <AgentSimRunner />
 
   return (

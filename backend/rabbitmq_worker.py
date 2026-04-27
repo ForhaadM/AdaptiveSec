@@ -80,7 +80,7 @@ def process_event(body):
     page_context = sanitized.get("page_context", "")
     event_id     = event.get("event_id", str(uuid.uuid4()))
 
-    # AC1 + AC2 + AC6 — Persist score to Neo4j and cache in Redis (additive)
+    
     try:
         current_score = get_risk_score(user_id)
         new_score = min(100.0, current_score + risk_delta)

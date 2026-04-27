@@ -29,9 +29,7 @@ export default function CognitiveProfileCard({ userId: propUserId, token: propTo
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
-  // 1. Wrap loadProfile in useCallback (Best Practice)
-  // This prevents the function from being "re-created" every render, 
-  // which avoids infinite loops.
+
   const loadProfile = useCallback(async () => {
     if (!userId) return;
 
@@ -48,7 +46,6 @@ export default function CognitiveProfileCard({ userId: propUserId, token: propTo
       const json = await res.json();
 
       if (isAgentView) {
-        // Your existing mapping logic for Agent View
         const bias_scores = { Urgency: 0, Authority: 0, Scarcity: 0, SocialProof: 0 };
         const triggerMap = { 'Urgency': 'Urgency', 'Authority': 'Authority', 'Scarcity': 'Scarcity', 'Social Proof': 'SocialProof' };
         let dominant = null, maxScore = 0;
@@ -69,14 +66,12 @@ export default function CognitiveProfileCard({ userId: propUserId, token: propTo
     } finally {
       setLoading(false);
     }
-  }, [userId, token, isAgentView]); // Dependencies for the function itself
+  }, [userId, token, isAgentView]);
 
-  // 2. The single Effect
+
   useEffect(() => {
     loadProfile();
   }, [loadProfile, refreshKey]);
-  // This triggers whenever the stable loadProfile function changes (rare) 
-  // or whenever refreshKey is incremented.
 
   if (loading) return (
     <div className="card cognitive-card">

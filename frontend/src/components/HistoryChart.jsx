@@ -48,7 +48,6 @@ export default function HistoryChart({ userId: propUserId, token: propToken, ref
     try {
       let url, headers
       if (isAgentView) {
-        // No-auth admin endpoint for agents
         url = `${BACKEND}/api/v1/admin/agent-history/${userId}?range=${param}`
         headers = {}
       } else {

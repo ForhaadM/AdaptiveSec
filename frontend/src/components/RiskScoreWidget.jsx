@@ -36,7 +36,6 @@ export default function RiskScoreWidget({ userId: propUserId, token: propToken, 
   const wsRef = useRef(null)
 
   function triggerFlash(direction) {
-    // direction: 'up' = score went up (bad), 'down' = score went down (good)
     const color = direction === 'up' ? 'red' : 'green'
     setFlashColor(color)
     if (flashTimerRef.current) clearTimeout(flashTimerRef.current)

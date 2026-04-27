@@ -153,17 +153,14 @@ export default function TrainingProgressSection({ userId: propUserId, token: pro
       const headers = isAgentView ? {} : { Authorization: `Bearer ${token}` }
       await fetch(url, { method: 'POST', headers })
 
-      // Update local state immediately
       setModules(prev => prev.map(m => m.id === selectedModule.id ? { ...m, status: 'complete', progress: 100 } : m))
       setSelectedModule(prev => ({ ...prev, status: 'complete' }))
 
-      // Wait for Neo4j to commit then trigger full refresh
       await new Promise(r => setTimeout(r, 1000))
       if (onComplete) onComplete()
     } catch { }
   }
 
-  // Pick the correct video based on video_index from backend
   function getVideoForModule(module, detail) {
     if (!detail) return null
     const allUrls = [detail.content_url, ...(detail.video_urls || []).filter(u => u !== detail.content_url)].filter(Boolean)
